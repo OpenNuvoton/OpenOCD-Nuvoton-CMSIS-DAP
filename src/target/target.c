@@ -144,6 +144,8 @@ static struct target_type *target_types[] = {
 	&arcv2_target,
 	&aarch64_target,
 	&mips_mips64_target,
+	&km1m7xx_target,
+	&km1m4xx_target,
 	NULL,
 };
 
