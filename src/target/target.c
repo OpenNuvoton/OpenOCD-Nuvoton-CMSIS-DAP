@@ -4,7 +4,7 @@
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
  *                                                                         *
- *   Copyright (C) 2007-2010 Øyvind Harboe                                 *
+ *   Copyright (C) 2007-2010 ?yvind Harboe                                 *
  *   oyvind.harboe@zylin.com                                               *
  *                                                                         *
  *   Copyright (C) 2008, Duane Ellis                                       *
@@ -103,6 +103,8 @@ extern struct target_type riscv_target;
 extern struct target_type mem_ap_target;
 extern struct target_type esirisc_target;
 extern struct target_type arcv2_target;
+extern struct target_type km1m7xx_target;
+extern struct target_type km1m4xx_target;
 
 static struct target_type *target_types[] = {
 	&arm7tdmi_target,
