@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -66,7 +68,7 @@
  */
 
 /* definition for security authentication */
-static uint32_t	km1m7xx_key_set		= 0;
+static uint32_t	km1m7xx_key_set	= 0;
 static uint32_t	km1m7xx_key_data[4]	= {	0xffffffff,
 										0xffffffff,
 										0xffffffff,
@@ -169,22 +171,22 @@ static int cortex_m_set_maskints_for_halt(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 	switch (cortex_m->isrmasking_mode) {
-		case CORTEX_M_ISRMASK_AUTO:
-			/* interrupts taken at resume, whether for step or run -> no mask */
-			return cortex_m_set_maskints(target, false);
+	case CORTEX_M_ISRMASK_AUTO:
+		/* interrupts taken at resume, whether for step or run -> no mask */
+		return cortex_m_set_maskints(target, false);
 
-		case CORTEX_M_ISRMASK_OFF:
-			/* interrupts never masked */
-			return cortex_m_set_maskints(target, false);
+	case CORTEX_M_ISRMASK_OFF:
+		/* interrupts never masked */
+		return cortex_m_set_maskints(target, false);
 
-		case CORTEX_M_ISRMASK_ON:
-			/* interrupts always masked */
-			return cortex_m_set_maskints(target, true);
+	case CORTEX_M_ISRMASK_ON:
+		/* interrupts always masked */
+		return cortex_m_set_maskints(target, true);
 
-		case CORTEX_M_ISRMASK_STEPONLY:
-			/* interrupts masked for single step only -> mask now if MASKINTS
-			 * erratum, otherwise only mask before stepping */
-			return cortex_m_set_maskints(target, cortex_m->maskints_erratum);
+	case CORTEX_M_ISRMASK_STEPONLY:
+		/* interrupts masked for single step only -> mask now if MASKINTS
+		 * erratum, otherwise only mask before stepping */
+		return cortex_m_set_maskints(target, cortex_m->maskints_erratum);
 	}
 	return ERROR_OK;
 }
@@ -192,21 +194,21 @@ static int cortex_m_set_maskints_for_halt(struct target *target)
 static int cortex_m_set_maskints_for_run(struct target *target)
 {
 	switch (target_to_cm(target)->isrmasking_mode) {
-		case CORTEX_M_ISRMASK_AUTO:
-			/* interrupts taken at resume, whether for step or run -> no mask */
-			return cortex_m_set_maskints(target, false);
+	case CORTEX_M_ISRMASK_AUTO:
+		/* interrupts taken at resume, whether for step or run -> no mask */
+		return cortex_m_set_maskints(target, false);
 
-		case CORTEX_M_ISRMASK_OFF:
-			/* interrupts never masked */
-			return cortex_m_set_maskints(target, false);
+	case CORTEX_M_ISRMASK_OFF:
+		/* interrupts never masked */
+		return cortex_m_set_maskints(target, false);
 
-		case CORTEX_M_ISRMASK_ON:
-			/* interrupts always masked */
-			return cortex_m_set_maskints(target, true);
+	case CORTEX_M_ISRMASK_ON:
+		/* interrupts always masked */
+		return cortex_m_set_maskints(target, true);
 
-		case CORTEX_M_ISRMASK_STEPONLY:
-			/* interrupts masked for single step only -> no mask */
-			return cortex_m_set_maskints(target, false);
+	case CORTEX_M_ISRMASK_STEPONLY:
+		/* interrupts masked for single step only -> no mask */
+		return cortex_m_set_maskints(target, false);
 	}
 	return ERROR_OK;
 }
@@ -214,21 +216,21 @@ static int cortex_m_set_maskints_for_run(struct target *target)
 static int cortex_m_set_maskints_for_step(struct target *target)
 {
 	switch (target_to_cm(target)->isrmasking_mode) {
-		case CORTEX_M_ISRMASK_AUTO:
-			/* the auto-interrupt should already be done -> mask */
-			return cortex_m_set_maskints(target, true);
+	case CORTEX_M_ISRMASK_AUTO:
+		/* the auto-interrupt should already be done -> mask */
+		return cortex_m_set_maskints(target, true);
 
-		case CORTEX_M_ISRMASK_OFF:
-			/* interrupts never masked */
-			return cortex_m_set_maskints(target, false);
+	case CORTEX_M_ISRMASK_OFF:
+		/* interrupts never masked */
+		return cortex_m_set_maskints(target, false);
 
-		case CORTEX_M_ISRMASK_ON:
-			/* interrupts always masked */
-			return cortex_m_set_maskints(target, true);
+	case CORTEX_M_ISRMASK_ON:
+		/* interrupts always masked */
+		return cortex_m_set_maskints(target, true);
 
-		case CORTEX_M_ISRMASK_STEPONLY:
-			/* interrupts masked for single step only -> mask */
-			return cortex_m_set_maskints(target, true);
+	case CORTEX_M_ISRMASK_STEPONLY:
+		/* interrupts masked for single step only -> mask */
+		return cortex_m_set_maskints(target, true);
 	}
 	return ERROR_OK;
 }
@@ -402,20 +404,21 @@ static int cortex_m_examine_debug_reason(struct target *target)
 	/* THIS IS NOT GOOD, TODO - better logic for detection of debug state reason
 	 * only check the debug reason if we don't know it already */
 
-	if ((target->debug_reason != DBG_REASON_DBGRQ)
-		&& (target->debug_reason != DBG_REASON_SINGLESTEP)) {
+	if (target->debug_reason != DBG_REASON_DBGRQ
+		&& target->debug_reason != DBG_REASON_SINGLESTEP) {
 		if (cortex_m->nvic_dfsr & DFSR_BKPT) {
 			target->debug_reason = DBG_REASON_BREAKPOINT;
 			if (cortex_m->nvic_dfsr & DFSR_DWTTRAP)
 				target->debug_reason = DBG_REASON_WPTANDBKPT;
-		} else if (cortex_m->nvic_dfsr & DFSR_DWTTRAP)
+		} else if (cortex_m->nvic_dfsr & DFSR_DWTTRAP) {
 			target->debug_reason = DBG_REASON_WATCHPOINT;
-		else if (cortex_m->nvic_dfsr & DFSR_VCATCH)
+		} else if (cortex_m->nvic_dfsr & DFSR_VCATCH) {
 			target->debug_reason = DBG_REASON_BREAKPOINT;
-		else if (cortex_m->nvic_dfsr & DFSR_EXTERNAL)
+		} else if (cortex_m->nvic_dfsr & DFSR_EXTERNAL) {
 			target->debug_reason = DBG_REASON_DBGRQ;
-		else	/* HALTED */
+		} else {	/* HALTED */
 			target->debug_reason = DBG_REASON_UNDEFINED;
+		}
 	}
 
 	return ERROR_OK;
@@ -432,53 +435,53 @@ static int cortex_m_examine_exception_reason(struct target *target)
 	if (retval != ERROR_OK)
 		return retval;
 	switch (armv7m->exception_number) {
-		case 2:	/* NMI */
-			break;
-		case 3:	/* Hard Fault */
-			retval = mem_ap_read_atomic_u32(armv7m->debug_ap, NVIC_HFSR, &except_sr);
+	case 2:	/* NMI */
+		break;
+	case 3:	/* Hard Fault */
+		retval = mem_ap_read_atomic_u32(armv7m->debug_ap, NVIC_HFSR, &except_sr);
+		if (retval != ERROR_OK)
+			return retval;
+		if (except_sr & 0x40000000) {
+			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &cfsr);
 			if (retval != ERROR_OK)
 				return retval;
-			if (except_sr & 0x40000000) {
-				retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &cfsr);
-				if (retval != ERROR_OK)
-					return retval;
-			}
-			break;
-		case 4:	/* Memory Management */
-			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &except_sr);
-			if (retval != ERROR_OK)
-				return retval;
-			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_MMFAR, &except_ar);
-			if (retval != ERROR_OK)
-				return retval;
-			break;
-		case 5:	/* Bus Fault */
-			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &except_sr);
-			if (retval != ERROR_OK)
-				return retval;
-			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_BFAR, &except_ar);
-			if (retval != ERROR_OK)
-				return retval;
-			break;
-		case 6:	/* Usage Fault */
-			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &except_sr);
-			if (retval != ERROR_OK)
-				return retval;
-			break;
-		case 11:	/* SVCall */
-			break;
-		case 12:	/* Debug Monitor */
-			retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_DFSR, &except_sr);
-			if (retval != ERROR_OK)
-				return retval;
-			break;
-		case 14:	/* PendSV */
-			break;
-		case 15:	/* SysTick */
-			break;
-		default:
-			except_sr = 0;
-			break;
+		}
+		break;
+	case 4:	/* Memory Management */
+		retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &except_sr);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_MMFAR, &except_ar);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case 5:	/* Bus Fault */
+		retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &except_sr);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_BFAR, &except_ar);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case 6:	/* Usage Fault */
+		retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_CFSR, &except_sr);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case 11:	/* SVCall */
+		break;
+	case 12:	/* Debug Monitor */
+		retval = mem_ap_read_u32(armv7m->debug_ap, NVIC_DFSR, &except_sr);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case 14:	/* PendSV */
+		break;
+	case 15:	/* SysTick */
+		break;
+	default:
+		except_sr = 0;
+		break;
 	}
 	retval = dap_run(swjdp);
 	if (retval == ERROR_OK)
@@ -492,7 +495,7 @@ static int cortex_m_examine_exception_reason(struct target *target)
 static int cortex_m_debug_entry(struct target *target)
 {
 	int i;
-	uint32_t xPSR;
+	uint32_t xpsr;
 	int retval;
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 	struct armv7m_common *armv7m = &cortex_m->armv7m;
@@ -525,22 +528,22 @@ static int cortex_m_debug_entry(struct target *target)
 	}
 
 	r = arm->cpsr;
-	xPSR = buf_get_u32(r->value, 0, 32);
+	xpsr = buf_get_u32(r->value, 0, 32);
 
-	/* For IT instructions xPSR must be reloaded on resume and clear on debug exec */
-	if (xPSR & 0xf00) {
+	/* For IT instructions xpsr must be reloaded on resume and clear on debug exec */
+	if (xpsr & 0xf00) {
 		r->dirty = r->valid;
-		cortex_m_store_core_reg_u32(target, 16, xPSR & ~0xff);
+		cortex_m_store_core_reg_u32(target, 16, xpsr & ~0xff);
 	}
 
 	/* Are we in an exception handler */
-	if (xPSR & 0x1FF) {
-		armv7m->exception_number = (xPSR & 0x1FF);
+	if (xpsr & 0x1FF) {
+		armv7m->exception_number = (xpsr & 0x1FF);
 
 		arm->core_mode = ARM_MODE_HANDLER;
 		arm->map = armv7m_msp_reg_map;
 	} else {
-		unsigned control = buf_get_u32(arm->core_cache
+		unsigned int control = buf_get_u32(arm->core_cache
 				->reg_list[ARMV7M_CONTROL].value, 0, 2);
 
 		/* is this thread privileged? */
@@ -573,7 +576,6 @@ static int cortex_m_debug_entry(struct target *target)
 
 	return ERROR_OK;
 }
-
 
 static int cortex_m_poll(struct target *target)
 {
@@ -636,7 +638,7 @@ static int cortex_m_poll(struct target *target)
 	if (cortex_m->dcb_dhcsr & S_HALT) {
 		target->state = TARGET_HALTED;
 
-		if ((prev_target_state == TARGET_RUNNING) || (prev_target_state == TARGET_RESET)) {
+		if (prev_target_state == TARGET_RUNNING || prev_target_state == TARGET_RESET) {
 			retval = cortex_m_debug_entry(target);
 			if (retval != ERROR_OK)
 				return retval;
@@ -669,7 +671,7 @@ static int cortex_m_poll(struct target *target)
 	}
 
 	/* Check that target is truly halted, since the target could be resumed externally */
-	if ((prev_target_state == TARGET_HALTED) && !(cortex_m->dcb_dhcsr & S_HALT)) {
+	if (prev_target_state == TARGET_HALTED && !(cortex_m->dcb_dhcsr & S_HALT)) {
 		/* registers are now invalid */
 		register_cache_invalidate(armv7m->arm.core_cache);
 
@@ -702,14 +704,13 @@ static int cortex_m_halt(struct target *target)
 		if ((jtag_get_reset_config() & RESET_SRST_PULLS_TRST) && jtag_get_srst()) {
 			LOG_ERROR("can't request a halt while in reset if nSRST pulls nTRST");
 			return ERROR_TARGET_FAILURE;
-		} else {
-			/* we came here in a reset_halt or reset_init sequence
-			 * debug entry was already prepared in cortex_m3_assert_reset()
-			 */
-			target->debug_reason = DBG_REASON_DBGRQ;
-
-			return ERROR_OK;
 		}
+		/* we came here in a reset_halt or reset_init sequence
+		 * debug entry was already prepared in cortex_m3_assert_reset()
+		 */
+		target->debug_reason = DBG_REASON_DBGRQ;
+
+		return ERROR_OK;
 	}
 
 	/* Write to Debug Halting Control and Status Register */
@@ -769,15 +770,15 @@ static int cortex_m_soft_reset_halt(struct target *target)
 				&& (cortex_m->nvic_dfsr & DFSR_VCATCH)) {
 				LOG_DEBUG("system reset-halted, DHCSR 0x%08x, "
 					"DFSR 0x%08x",
-					(unsigned) dcb_dhcsr,
-					(unsigned) cortex_m->nvic_dfsr);
+					(unsigned int)dcb_dhcsr,
+					(unsigned int)cortex_m->nvic_dfsr);
 				cortex_m_poll(target);
 				/* FIXME restore user's vector catch config */
 				return ERROR_OK;
-			} else
-				LOG_DEBUG("waiting for system reset-halt, "
-					"DHCSR 0x%08x, %d ms",
-					(unsigned) dcb_dhcsr, timeout);
+			}
+			LOG_DEBUG("waiting for system reset-halt, "
+				"DHCSR 0x%08x, %d ms",
+				(unsigned int)dcb_dhcsr, timeout);
 		}
 		timeout++;
 		alive_sleep(1);
@@ -927,7 +928,7 @@ static int cortex_m_step(struct target *target, int current,
 	/* if no bkpt instruction is found at pc then we can perform
 	 * a normal step, otherwise we have to manually step over the bkpt
 	 * instruction - as such simulate a step */
-	if (bkpt_inst_found == false) {
+	if (!bkpt_inst_found) {
 		if (cortex_m->isrmasking_mode != CORTEX_M_ISRMASK_AUTO) {
 			/* Automatic ISR masking mode off: Just step over the next
 			 * instruction, with interrupts on or off as appropriate. */
@@ -976,7 +977,6 @@ static int cortex_m_step(struct target *target, int current,
 				cortex_m_write_debug_halt_mask(target, C_HALT, 0);
 				cortex_m_set_maskints_for_halt(target);
 			} else {
-
 				/* Set a temporary break point */
 				if (breakpoint) {
 					retval = cortex_m_set_breakpoint(target, breakpoint);
@@ -1018,9 +1018,9 @@ static int cortex_m_step(struct target *target, int current,
 					} while (!((cortex_m->dcb_dhcsr & S_HALT) || isr_timed_out));
 
 					/* only remove breakpoint if we created it */
-					if (breakpoint)
+					if (breakpoint) {
 						cortex_m_unset_breakpoint(target, breakpoint);
-					else {
+					} else {
 						/* Remove the temporary breakpoint */
 						breakpoint_remove(target, pc_value);
 					}
@@ -1109,10 +1109,9 @@ static int km1m7xx_m_assert_reset(struct target *target)
 			if (target->reset_halt)
 				LOG_ERROR("Target not examined, will not halt after reset!");
 			return ERROR_OK;
-		} else {
-			LOG_ERROR("Target not examined, reset NOT asserted!");
-			return ERROR_FAIL;
 		}
+		LOG_ERROR("Target not examined, reset NOT asserted!");
+		return ERROR_FAIL;
 	}
 
 	if ((jtag_reset_config & RESET_HAS_SRST) &&
@@ -1129,22 +1128,20 @@ static int km1m7xx_m_assert_reset(struct target *target)
 
 	/* Disable WDT */
 	ret = target_read_u32(target, 0xf0102010, &optreg0);
-	if (ret != ERROR_OK) {
+	if (ret != ERROR_OK)
 		return ret;
-	}
+
 	ret = target_write_u32(target, 0xf0102010, ((optreg0 & 0xffff) | optreg0_key | 0x00000004));
-	if (ret != ERROR_OK) {
+	if (ret != ERROR_OK)
 		return ret;
-	}
 
 	/* When CPUID is 0x00000000, it may be security locked. */
 	ret = target_read_u32(target, 0xe000ed00, &cpuid);
-	if (ret != ERROR_OK) {
+	if (ret != ERROR_OK)
 		return ret;
-	}
 
 	LOG_INFO("CPUID = 0x%08x\n", cpuid);
-	if ((cpuid == 0x00000000) && (km1m7xx_key_set == 1)) {
+	if (cpuid == 0 && km1m7xx_key_set == 1) {
 		/* Unlock DAP */
 		target_write_u32(target, 0xf0102000, km1m7xx_key_data[0]);
 		target_write_u32(target, 0xf0102004, km1m7xx_key_data[1]);
@@ -1153,9 +1150,9 @@ static int km1m7xx_m_assert_reset(struct target *target)
 
 		/* Still if the CPUID is 0x00000000, the security can not be unlocked */
 		ret = target_read_u32(target, 0xe000ed00, &cpuid);
-		if (ret != ERROR_OK) {
+		if (ret != ERROR_OK)
 			return ret;
-		}
+
 		LOG_INFO("CPUID = 0x%08x\n", cpuid);
 		if (cpuid == 0x00000000) {
 			LOG_ERROR("Cannot unlock security");
@@ -1240,10 +1237,9 @@ static int km1m7xx_m_assert_reset(struct target *target)
 			LOG_DEBUG("Ignoring AP write error right after reset");
 
 		retval3 = dap_dp_init(armv7m->debug_ap->dap);
-		if (retval3 != ERROR_OK)
+		if (retval3 != ERROR_OK) {
 			LOG_ERROR("DP initialisation failed");
-
-		else {
+		} else {
 			/* I do not know why this is necessary, but it
 			 * fixes strange effects (step/resume cause NMI
 			 * after reset) on LM3S6918 -- Michael Schwingen
@@ -1303,76 +1299,76 @@ static int cortex_m_load_core_reg_u32(struct target *target,
 
 	/* NOTE:  we "know" here that the register identifiers used
 	 * in the v7m header match the Cortex-M3 Debug Core Register
-	 * Selector values for R0..R15, xPSR, MSP, and PSP.
+	 * Selector values for R0..R15, xpsr, MSP, and PSP.
 	 */
 	switch (num) {
-		case 0 ... 18:
-			/* read a normal core register */
-			retval = cortexm_dap_read_coreregister_u32(target, value, num);
+	case 0 ... 18:
+		/* read a normal core register */
+		retval = cortexm_dap_read_coreregister_u32(target, value, num);
 
-			if (retval != ERROR_OK) {
-				LOG_ERROR("JTAG failure %i", retval);
-				return ERROR_JTAG_DEVICE_ERROR;
-			}
-			LOG_DEBUG("load from core reg %i  value 0x%" PRIx32 "", (int)num, *value);
-			break;
+		if (retval != ERROR_OK) {
+			LOG_ERROR("JTAG failure %i", retval);
+			return ERROR_JTAG_DEVICE_ERROR;
+		}
+		LOG_DEBUG("load from core reg %i  value 0x%" PRIx32 "", (int)num, *value);
+		break;
 
-		case ARMV7M_FPSCR:
-			/* Floating-point Status and Registers */
-			retval = target_write_u32(target, DCB_DCRSR, 0x21);
-			if (retval != ERROR_OK)
-				return retval;
-			retval = target_read_u32(target, DCB_DCRDR, value);
-			if (retval != ERROR_OK)
-				return retval;
-			LOG_DEBUG("load from FPSCR  value 0x%" PRIx32, *value);
-			break;
+	case ARMV7M_FPSCR:
+		/* Floating-point Status and Registers */
+		retval = target_write_u32(target, DCB_DCRSR, 0x21);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = target_read_u32(target, DCB_DCRDR, value);
+		if (retval != ERROR_OK)
+			return retval;
+		LOG_DEBUG("load from FPSCR  value 0x%" PRIx32, *value);
+		break;
 
-		case ARMV7M_REGSEL_S0 ... ARMV7M_REGSEL_S31:
-			/* Floating-point Status and Registers */
-			retval = target_write_u32(target, DCB_DCRSR, num - ARMV7M_REGSEL_S0 + 0x40);
-			if (retval != ERROR_OK)
-				return retval;
-			retval = target_read_u32(target, DCB_DCRDR, value);
-			if (retval != ERROR_OK)
-				return retval;
-			LOG_DEBUG("load from FPU reg S%d  value 0x%" PRIx32,
-				  (int)(num - ARMV7M_REGSEL_S0), *value);
-			break;
+	case ARMV7M_REGSEL_S0 ... ARMV7M_REGSEL_S31:
+		/* Floating-point Status and Registers */
+		retval = target_write_u32(target, DCB_DCRSR, num - ARMV7M_REGSEL_S0 + 0x40);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = target_read_u32(target, DCB_DCRDR, value);
+		if (retval != ERROR_OK)
+			return retval;
+		LOG_DEBUG("load from FPU reg S%d  value 0x%" PRIx32,
+			  (int)(num - ARMV7M_REGSEL_S0), *value);
+		break;
 
-		case ARMV7M_PRIMASK:
-		case ARMV7M_BASEPRI:
-		case ARMV7M_FAULTMASK:
-		case ARMV7M_CONTROL:
-			/* Cortex-M3 packages these four registers as bitfields
-			 * in one Debug Core register.  So say r0 and r2 docs;
-			 * it was removed from r1 docs, but still works.
-			 */
-			cortexm_dap_read_coreregister_u32(target, value, 20);
+	case ARMV7M_PRIMASK:
+	case ARMV7M_BASEPRI:
+	case ARMV7M_FAULTMASK:
+	case ARMV7M_CONTROL:
+		/* Cortex-M3 packages these four registers as bitfields
+		 * in one Debug Core register.  So say r0 and r2 docs;
+		 * it was removed from r1 docs, but still works.
+		 */
+		cortexm_dap_read_coreregister_u32(target, value, 20);
 
-			switch (num) {
-				case ARMV7M_PRIMASK:
-					*value = buf_get_u32((uint8_t *)value, 0, 1);
-					break;
+		switch (num) {
+			case ARMV7M_PRIMASK:
+				*value = buf_get_u32((uint8_t *)value, 0, 1);
+				break;
 
-				case ARMV7M_BASEPRI:
-					*value = buf_get_u32((uint8_t *)value, 8, 8);
-					break;
+			case ARMV7M_BASEPRI:
+				*value = buf_get_u32((uint8_t *)value, 8, 8);
+				break;
 
-				case ARMV7M_FAULTMASK:
-					*value = buf_get_u32((uint8_t *)value, 16, 1);
-					break;
+			case ARMV7M_FAULTMASK:
+				*value = buf_get_u32((uint8_t *)value, 16, 1);
+				break;
 
-				case ARMV7M_CONTROL:
-					*value = buf_get_u32((uint8_t *)value, 24, 2);
-					break;
-			}
+			case ARMV7M_CONTROL:
+				*value = buf_get_u32((uint8_t *)value, 24, 2);
+				break;
+		}
 
-			LOG_DEBUG("load from special reg %i value 0x%" PRIx32 "", (int)num, *value);
-			break;
+		LOG_DEBUG("load from special reg %i value 0x%" PRIx32 "", (int)num, *value);
+		break;
 
-		default:
-			return ERROR_COMMAND_SYNTAX_ERROR;
+	default:
+		return ERROR_COMMAND_SYNTAX_ERROR;
 	}
 
 	return ERROR_OK;
@@ -1387,80 +1383,80 @@ static int cortex_m_store_core_reg_u32(struct target *target,
 
 	/* NOTE:  we "know" here that the register identifiers used
 	 * in the v7m header match the Cortex-M3 Debug Core Register
-	 * Selector values for R0..R15, xPSR, MSP, and PSP.
+	 * Selector values for R0..R15, xpsr, MSP, and PSP.
 	 */
 	switch (num) {
-		case 0 ... 18:
-			retval = cortexm_dap_write_coreregister_u32(target, value, num);
-			if (retval != ERROR_OK) {
-				struct reg *r;
+	case 0 ... 18:
+		retval = cortexm_dap_write_coreregister_u32(target, value, num);
+		if (retval != ERROR_OK) {
+			struct reg *r;
 
-				LOG_ERROR("JTAG failure");
-				r = armv7m->arm.core_cache->reg_list + num;
-				r->dirty = r->valid;
-				return ERROR_JTAG_DEVICE_ERROR;
-			}
-			LOG_DEBUG("write core reg %i value 0x%" PRIx32 "", (int)num, value);
-			break;
+			LOG_ERROR("JTAG failure");
+			r = armv7m->arm.core_cache->reg_list + num;
+			r->dirty = r->valid;
+			return ERROR_JTAG_DEVICE_ERROR;
+		}
+		LOG_DEBUG("write core reg %i value 0x%" PRIx32 "", (int)num, value);
+		break;
 
-		case ARMV7M_FPSCR:
-			/* Floating-point Status and Registers */
-			retval = target_write_u32(target, DCB_DCRDR, value);
-			if (retval != ERROR_OK)
-				return retval;
-			retval = target_write_u32(target, DCB_DCRSR, 0x21 | (1<<16));
-			if (retval != ERROR_OK)
-				return retval;
-			LOG_DEBUG("write FPSCR value 0x%" PRIx32, value);
-			break;
+	case ARMV7M_FPSCR:
+		/* Floating-point Status and Registers */
+		retval = target_write_u32(target, DCB_DCRDR, value);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = target_write_u32(target, DCB_DCRSR, 0x21 | (1 << 16));
+		if (retval != ERROR_OK)
+			return retval;
+		LOG_DEBUG("write FPSCR value 0x%" PRIx32, value);
+		break;
 
-		case ARMV7M_REGSEL_S0 ... ARMV7M_REGSEL_S31:
-			/* Floating-point Status and Registers */
-			retval = target_write_u32(target, DCB_DCRDR, value);
-			if (retval != ERROR_OK)
-				return retval;
-			retval = target_write_u32(target, DCB_DCRSR, (num - ARMV7M_REGSEL_S0 + 0x40) | (1<<16));
-			if (retval != ERROR_OK)
-				return retval;
-			LOG_DEBUG("write FPU reg S%d  value 0x%" PRIx32,
-				  (int)(num - ARMV7M_REGSEL_S0), value);
-			break;
+	case ARMV7M_REGSEL_S0 ... ARMV7M_REGSEL_S31:
+		/* Floating-point Status and Registers */
+		retval = target_write_u32(target, DCB_DCRDR, value);
+		if (retval != ERROR_OK)
+			return retval;
+		retval = target_write_u32(target, DCB_DCRSR, (num - ARMV7M_REGSEL_S0 + 0x40) | (1 << 16));
+		if (retval != ERROR_OK)
+			return retval;
+		LOG_DEBUG("write FPU reg S%d  value 0x%" PRIx32,
+			  (int)(num - ARMV7M_REGSEL_S0), value);
+		break;
 
-		case ARMV7M_PRIMASK:
-		case ARMV7M_BASEPRI:
-		case ARMV7M_FAULTMASK:
-		case ARMV7M_CONTROL:
-			/* Cortex-M3 packages these four registers as bitfields
-			 * in one Debug Core register.  So say r0 and r2 docs;
-			 * it was removed from r1 docs, but still works.
-			 */
-			cortexm_dap_read_coreregister_u32(target, &reg, 20);
+	case ARMV7M_PRIMASK:
+	case ARMV7M_BASEPRI:
+	case ARMV7M_FAULTMASK:
+	case ARMV7M_CONTROL:
+		/* Cortex-M3 packages these four registers as bitfields
+		 * in one Debug Core register.  So say r0 and r2 docs;
+		 * it was removed from r1 docs, but still works.
+		 */
+		cortexm_dap_read_coreregister_u32(target, &reg, 20);
 
-			switch (num) {
-				case ARMV7M_PRIMASK:
-					buf_set_u32((uint8_t *)&reg, 0, 1, value);
-					break;
+		switch (num) {
+			case ARMV7M_PRIMASK:
+				buf_set_u32((uint8_t *)&reg, 0, 1, value);
+				break;
 
-				case ARMV7M_BASEPRI:
-					buf_set_u32((uint8_t *)&reg, 8, 8, value);
-					break;
+			case ARMV7M_BASEPRI:
+				buf_set_u32((uint8_t *)&reg, 8, 8, value);
+				break;
 
-				case ARMV7M_FAULTMASK:
-					buf_set_u32((uint8_t *)&reg, 16, 1, value);
-					break;
+			case ARMV7M_FAULTMASK:
+				buf_set_u32((uint8_t *)&reg, 16, 1, value);
+				break;
 
-				case ARMV7M_CONTROL:
-					buf_set_u32((uint8_t *)&reg, 24, 2, value);
-					break;
-			}
+			case ARMV7M_CONTROL:
+				buf_set_u32((uint8_t *)&reg, 24, 2, value);
+				break;
+		}
 
-			cortexm_dap_write_coreregister_u32(target, reg, 20);
+		cortexm_dap_write_coreregister_u32(target, reg, 20);
 
-			LOG_DEBUG("write special reg %i value 0x%" PRIx32 " ", (int)num, value);
-			break;
+		LOG_DEBUG("write special reg %i value 0x%" PRIx32 " ", (int)num, value);
+		break;
 
-		default:
-			return ERROR_COMMAND_SYNTAX_ERROR;
+	default:
+		return ERROR_COMMAND_SYNTAX_ERROR;
 	}
 
 	return ERROR_OK;
@@ -1473,7 +1469,7 @@ static int cortex_m_read_memory(struct target *target, target_addr_t address,
 
 	if (armv7m->arm.arch == ARM_ARCH_V6M) {
 		/* armv6m does not handle unaligned memory access */
-		if (((size == 4) && (address & 0x3u)) || ((size == 2) && (address & 0x1u)))
+		if ((size == 4 && (address & 0x3u)) || (size == 2 && (address & 0x1u)))
 			return ERROR_TARGET_UNALIGNED_ACCESS;
 	}
 
@@ -1487,7 +1483,7 @@ static int cortex_m_write_memory(struct target *target, target_addr_t address,
 
 	if (armv7m->arm.arch == ARM_ARCH_V6M) {
 		/* armv6m does not handle unaligned memory access */
-		if (((size == 4) && (address & 0x3u)) || ((size == 2) && (address & 0x1u)))
+		if ((size == 4 && (address & 0x3u)) || (size == 2 && (address & 0x1u)))
 			return ERROR_TARGET_UNALIGNED_ACCESS;
 	}
 
@@ -1623,7 +1619,7 @@ static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 		return ERROR_FAIL;
 
 	struct cortex_m_common *cortex_m = calloc(1, sizeof(struct cortex_m_common));
-	if (cortex_m == NULL) {
+	if (!cortex_m) {
 		LOG_ERROR("No memory creating target");
 		return ERROR_FAIL;
 	}
@@ -1638,13 +1634,13 @@ static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 
 COMMAND_HANDLER(km1m7xx_handle_calc_image_checksum_command)
 {
-	uint8_t			*buffer;
-	size_t			buf_cnt;
-	uint32_t		image_size;
-	struct image	image;
-	unsigned int	i;
-	int 			retval;
-	uint32_t		checksum = 0;
+	uint8_t *buffer;
+	size_t buf_cnt;
+	uint32_t image_size;
+	struct image image;
+	unsigned int i;
+	int retval;
+	uint32_t checksum = 0;
 
 	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
@@ -1661,7 +1657,7 @@ COMMAND_HANDLER(km1m7xx_handle_calc_image_checksum_command)
 	retval = ERROR_OK;
 	for (i = 0; i < image.num_sections; i++) {
 		buffer = malloc(image.sections[i].size);
-		if (buffer == NULL) {
+		if (!buffer) {
 			command_print(CMD,
 					"error allocating buffer for section (%d bytes)",
 					(int)(image.sections[i].size));
@@ -1680,9 +1676,9 @@ COMMAND_HANDLER(km1m7xx_handle_calc_image_checksum_command)
 			break;
 		}
 
-		LOG_INFO(	"checksum of section:0x%08x-0x%08x is 0x%08x\n",
+		LOG_INFO("checksum of section:0x%08x-0x%08x is 0x%08x\n",
 					(uint32_t)image.sections[i].base_address,
-					(uint32_t)image.sections[i].base_address + buf_cnt - 1,
+				(uint32_t)(image.sections[i].base_address + buf_cnt - 1),
 					checksum);
 
 		free(buffer);
@@ -1693,15 +1689,15 @@ COMMAND_HANDLER(km1m7xx_handle_calc_image_checksum_command)
 
 COMMAND_HANDLER(km1m7xx_handle_calc_memory_checksum_command)
 {
-	uint8_t			*buffer;
-	size_t			buf_cnt;
-	uint32_t		image_size;
-	struct image	image;
-	unsigned int	i;
-	int 			retval;
-	uint32_t		checksum = 0;
-	uint32_t		mem_checksum = 0;
-	struct target	*target = get_current_target(CMD_CTX);
+	uint8_t *buffer;
+	size_t buf_cnt;
+	uint32_t image_size;
+	struct image image;
+	unsigned int i;
+	int retval;
+	uint32_t checksum = 0;
+	uint32_t mem_checksum = 0;
+	struct target *target = get_current_target(CMD_CTX);
 
 	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
@@ -1723,7 +1719,7 @@ COMMAND_HANDLER(km1m7xx_handle_calc_memory_checksum_command)
 	retval = ERROR_OK;
 	for (i = 0; i < image.num_sections; i++) {
 		buffer = malloc(image.sections[i].size);
-		if (buffer == NULL) {
+		if (!buffer) {
 			command_print(CMD,
 					"error allocating buffer for section (%d bytes)",
 					(int)(image.sections[i].size));
@@ -1748,9 +1744,9 @@ COMMAND_HANDLER(km1m7xx_handle_calc_memory_checksum_command)
 			break;
 		}
 
-		LOG_INFO(	"checksum of section:0x%08x-0x%08x is (file)0x%08x, (memory)0x%08x\n",
+		LOG_INFO("checksum of section:0x%08x-0x%08x is (file)0x%08x, (memory)0x%08x\n",
 					(uint32_t)image.sections[i].base_address,
-					(uint32_t)image.sections[i].base_address + buf_cnt - 1,
+				(uint32_t)(image.sections[i].base_address + buf_cnt - 1),
 					checksum, mem_checksum);
 
 		free(buffer);
@@ -1762,23 +1758,21 @@ COMMAND_HANDLER(km1m7xx_handle_calc_memory_checksum_command)
 
 COMMAND_HANDLER(km1m7xx_handle_keycode_file_command)
 {
-	FILE		*fp_keyfile;
-	char		key_str[16];
-	int			key_count;
+	FILE *fp_keyfile;
+	char key_str[16];
+	int	key_count;
 
-	if (CMD_ARGC != 1) {
+	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
-	}
 
 	fp_keyfile = fopen(CMD_ARGV[0], "r");
-	if (fp_keyfile == NULL) {
+	if (!fp_keyfile)
 		return ERROR_FAIL;
-	}
 
 	key_count = 0;
-	while (fgets(key_str, 15, fp_keyfile) != NULL) {
+	while (fgets(key_str, 15, fp_keyfile))
 		km1m7xx_key_data[key_count++] = strtoul(key_str, NULL, 16);
-	}
+
 	fclose(fp_keyfile);
 
 	km1m7xx_key_set = 1;
@@ -1791,16 +1785,15 @@ COMMAND_HANDLER(km1m7xx_handle_keycode_data_command)
 	char		key_str[16];
 	int			key_count;
 
-	if (CMD_ARGC != 4) {
+	if (CMD_ARGC != 4)
 		return ERROR_COMMAND_SYNTAX_ERROR;
-	}
 
 	for (key_count = 0; key_count < 4; key_count++) {
-		if (strncmp(CMD_ARGV[key_count], "0x", 2) != 0) {
+		if (strncmp(CMD_ARGV[key_count], "0x", 2) != 0)
 			strcpy(key_str, "0x");
-		} else {
+		else
 			key_str[0] = '\0';
-		}
+
 		strcat(key_str, CMD_ARGV[key_count]);
 		COMMAND_PARSE_NUMBER(u32, key_str, km1m7xx_key_data[key_count]);
 	}

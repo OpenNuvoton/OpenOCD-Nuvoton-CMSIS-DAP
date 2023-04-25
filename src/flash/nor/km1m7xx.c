@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2021 by Nuvoton Technology Corporation Japan            *
  *   Yoshikazu Yamaguchi <yamaguchi.yoshikazu@nuvoton.com>                 *
@@ -63,11 +65,11 @@
 #define	CCSIDR						0xE000ED80
 #define	CCSIDR_SSOCIATIVITY_POS		3
 #define	CCSIDR_SSOCIATIVITY_MASK	((uint32_t)0x3FF << CCSIDR_SSOCIATIVITY_POS)
-#define	CCSIDR_WAYS(cssidr)			((cssidr & CCSIDR_SSOCIATIVITY_MASK) \
+#define	CCSIDR_WAYS(cssidr)			(((cssidr) & CCSIDR_SSOCIATIVITY_MASK) \
 										>> CCSIDR_SSOCIATIVITY_POS)
 #define	CCSIDR_NUMSETS_POS			13
 #define	CCSIDR_NUMSETS_MASK			((uint32_t)0x7FFF << CCSIDR_NUMSETS_POS)
-#define	CCSIDR_SETS(cssidr)			((cssidr & CCSIDR_NUMSETS_MASK) \
+#define	CCSIDR_SETS(cssidr)			(((cssidr) & CCSIDR_NUMSETS_MASK) \
 										>> CCSIDR_NUMSETS_POS)
 
 #define	CSSELR						0xE000ED84
@@ -110,35 +112,34 @@
 static const struct km1mxxx_cpu_type km1m7xx_parts_km1m7ab[] = {
 	/*PART NO*/			/*PART ID*/		/*Banks*/
 	/* KM1M7A/B Series */
-	{"KM1M7A/BFxxK",	0x00000000,		KM1M7ABX_BANKS(256*1024, 64*1024)},
-	{"KM1M7A/BFxxM",	0x00000000,		KM1M7ABX_BANKS(384*1024, 64*1024)},
-	{"KM1M7A/BFxxN",	0x00000000,		KM1M7ABX_BANKS(512*1024, 64*1024)},
+	{"KM1M7A/BFxxK",	0x00000000,		KM1M7ABX_BANKS(256 * 1024, 64 * 1024)},
+	{"KM1M7A/BFxxM",	0x00000000,		KM1M7ABX_BANKS(384 * 1024, 64 * 1024)},
+	{"KM1M7A/BFxxN",	0x00000000,		KM1M7ABX_BANKS(512 * 1024, 64 * 1024)},
 };
 
 static const struct km1mxxx_cpu_type km1m7xx_parts[] = {
 	/*PART NO*/			/*PART ID*/		/*Banks*/
 	/* KM1M7C Series */
-	{"KM1M7CF03N",		0x08700100,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF03K",		0x08700000,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF04N",		0x08700101,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF04K",		0x08700001,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF05N",		0x08700102,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF05K",		0x08700002,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF06N",		0x08700103,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF06K",		0x08700003,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF13N",		0x08701100,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF13K",		0x08701000,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF14N",		0x08701101,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF14K",		0x08701001,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF15N",		0x08701102,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF15K",		0x08701002,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
-	{"KM1M7CF16N",		0x08701103,		KM1M7CX_BANKS(512*1024, 16*1024, 16*1024)},
-	{"KM1M7CF16K",		0x08701003,		KM1M7CX_BANKS(256*1024, 16*1024, 16*1024)},
+	{"KM1M7CF03N",		0x08700100,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF03K",		0x08700000,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF04N",		0x08700101,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF04K",		0x08700001,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF05N",		0x08700102,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF05K",		0x08700002,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF06N",		0x08700103,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF06K",		0x08700003,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF13N",		0x08701100,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF13K",		0x08701000,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF14N",		0x08701101,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF14K",		0x08701001,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF15N",		0x08701102,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF15K",		0x08701002,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF16N",		0x08701103,		KM1M7CX_BANKS(512 * 1024, 16 * 1024, 16 * 1024)},
+	{"KM1M7CF16K",		0x08701003,		KM1M7CX_BANKS(256 * 1024, 16 * 1024, 16 * 1024)},
 };
 
 /* Definition for static variable  */
 static uint32_t backup_ccr = 0;
-
 
 /* Definition for static functions */
 static int km1m7xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_type **cpu);
@@ -153,12 +154,11 @@ static void	invalidate_dcache(struct flash_bank *bank);
 
 static void	enable_icache(struct flash_bank *bank)
 {
-	uint32_t	read_ccr		= 0;
+	uint32_t read_ccr = 0;
 
 	/* Do nothing if I-Cache is invalid before writing */
-	if ((backup_ccr & CCR_IC) == 0) {
+	if ((backup_ccr & CCR_IC) == 0)
 		return;
-	}
 
 	/* Invalidate I-Cache */
 	target_write_u32(bank->target, ICIALLU, ICIALLU_INVALIDATE);
@@ -170,12 +170,11 @@ static void	enable_icache(struct flash_bank *bank)
 
 static void	disable_icache(struct flash_bank *bank)
 {
-	uint32_t	read_ccr		= 0;
+	uint32_t read_ccr = 0;
 
 	/* Do nothing if I-Cache is disabeled */
-	if ((backup_ccr & CCR_IC) == 0) {
+	if ((backup_ccr & CCR_IC) == 0)
 		return;
-	}
 
 	/* Disable I-Cache */
 	target_read_u32(bank->target, CCR, &read_ccr);
@@ -185,12 +184,11 @@ static void	disable_icache(struct flash_bank *bank)
 
 static void enable_dcache(struct flash_bank *bank)
 {
-	uint32_t	read_ccr		= 0;
+	uint32_t read_ccr = 0;
 
 	/* Do nothing if D-Cache is invalid before writing */
-	if ((backup_ccr & CCR_DC) == 0) {
+	if ((backup_ccr & CCR_DC) == 0)
 		return;
-	}
 
 	/* Invalidate D-Cache */
 	invalidate_dcache(bank);
@@ -202,12 +200,11 @@ static void enable_dcache(struct flash_bank *bank)
 
 static void disable_dcache(struct flash_bank *bank)
 {
-	uint32_t	read_ccr		= 0;
+	uint32_t read_ccr = 0;
 
 	/* Do nothing if D-Cache is disabeled */
-	if ((backup_ccr & CCR_DC) == 0) {
+	if ((backup_ccr & CCR_DC) == 0)
 		return;
-	}
 
 	/* Disable D-Cache */
 	target_read_u32(bank->target, CCR, &read_ccr);
@@ -217,11 +214,11 @@ static void disable_dcache(struct flash_bank *bank)
 	invalidate_dcache(bank);
 }
 
-static void invalidate_dcache (struct flash_bank *bank)
+static void invalidate_dcache(struct flash_bank *bank)
 {
-	uint32_t	read_ccsidr;
-	uint32_t	sets;
-	uint32_t	ways;
+	uint32_t read_ccsidr;
+	uint32_t sets;
+	uint32_t ways;
 
 	/*	Select Level 1 data cache */
 	target_write_u32(bank->target, CSSELR, CSSELR_IND_DATA);
@@ -234,11 +231,8 @@ static void invalidate_dcache (struct flash_bank *bank)
 		do {
 			target_write_u32(bank->target, DCCISW, DCCISW_SET(sets) | DCCISW_WAY(ways));
 		} while (ways--);
-	} while(sets--);
-
+	} while (sets--);
 }
-
-
 
 /**
  * @brief	"flash bank" Command
@@ -293,11 +287,10 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 	}
 
 	/* Set flash type parameter */
-	if (flash_type == KM1M7XX_FLASH_TYPE_KM1M7C) {
+	if (flash_type == KM1M7XX_FLASH_TYPE_KM1M7C)
 		cache_ctrl_flag	= 1;
-	} else {
+	else
 		cache_ctrl_flag	= 0;
-	}
 
 	/* Flash Cache disable */
 	if (cache_ctrl_flag) {
@@ -318,7 +311,6 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 	/* Erase specified sectors */
 	for (sector_index = first; sector_index <= last; sector_index++) {
-
 		/* Get sector address */
 		address = bank->base + bank->sectors[sector_index].offset;
 		LOG_INFO("Erase at 0x%08x (Index:%d) ", address, sector_index);
@@ -340,22 +332,20 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 		read_fmon &= 0xFFFF;
 		timeout = timeval_ms();
 		while (1) {
-
 			/* Check for completion */
 			target_read_u32(bank->target, FMON, &read_fmon);
-			if ((read_fmon & FMON_WBUSY) == 0x0000) {
+			if ((read_fmon & FMON_WBUSY) == 0x0000)
 				break;
-			}
 
 			/* Check error */
 			if ((read_fmon & FMON_ERROR) != 0) {
-				LOG_DEBUG("km1m7xx_erase() Error : FMON = %d\n", read_fmon);
+				LOG_DEBUG("%s Error : FMON = %d\n", __func__, read_fmon);
 				return ERROR_FAIL;
 			}
 
 			/* Check timeout */
 			if ((timeval_ms() - timeout) > TIMEOUT_ERASE) {
-				LOG_DEBUG("km1m7xx_erase() timeout : FMON = %d\n", read_fmon);
+				LOG_DEBUG("%s timeout : FMON = %d\n", __func__, read_fmon);
 				/* Flash Cache disable */
 				if (cache_ctrl_flag) {
 					enable_icache(bank);
@@ -372,7 +362,7 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 		/* Check error */
 		if ((read_fmon & FMON_ERROR) != 0) {
-			LOG_DEBUG("km1m7xx_erase() Error : FMON = %d\n", read_fmon);
+			LOG_DEBUG("%s Error : FMON = %d\n", __func__, read_fmon);
 			/* Flash Cache disable */
 			if (cache_ctrl_flag) {
 				enable_icache(bank);
@@ -393,7 +383,6 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t offset, uint32_t count)
 {
-
 	int						result			= ERROR_OK;
 	struct target			*target			= bank->target;
 	struct working_area		*algorithm		= NULL;
@@ -417,59 +406,59 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	struct km1mxxx_flash_bank	*flash_bank_info;
 
 	static const uint8_t write_code[] = {
-		0xF0, 0xB5, 0x00, 0x22, 0x00, 0x23, 0x00, 0x24, 
-		0x00, 0x20, 0x00, 0x21, 0x00, 0x25, 0x28, 0x4E, 
-		0x4E, 0x44, 0x32, 0x68, 0x27, 0x4E, 0x4E, 0x44, 
-		0x33, 0x68, 0x27, 0x4E, 0x4E, 0x44, 0x34, 0x68, 
-		0x00, 0x26, 0x26, 0x4F, 0x4F, 0x44, 0x3E, 0x60, 
-		0x3C, 0xE0, 0x25, 0x4E, 0xF2, 0x60, 0x00, 0x20, 
-		0x06, 0xE0, 0x40, 0xCB, 0xDF, 0xF8, 0x88, 0xC0, 
-		0x0C, 0xEB, 0x80, 0x07, 0x3E, 0x61, 0x40, 0x1C, 
-		0x20, 0x4E, 0x4E, 0x44, 0x36, 0x68, 0xB0, 0xEB, 
-		0x96, 0x0F, 0xF2, 0xD3, 0x00, 0x26, 0x1C, 0x4F, 
-		0x3E, 0x71, 0x01, 0x26, 0x3E, 0x71, 0x3E, 0x46, 
-		0x31, 0x89, 0x31, 0x89, 0x31, 0x89, 0x1A, 0x4D, 
-		0x31, 0x89, 0x00, 0xBF, 0x2E, 0x1E, 0xA5, 0xF1, 
-		0x01, 0x05, 0x00, 0xD1, 0xF0, 0xBD, 0x14, 0x4E, 
-		0x31, 0x89, 0x01, 0xF0, 0x01, 0x06, 0x00, 0x2E, 
-		0xF4, 0xD1, 0x11, 0x4E, 0x36, 0x79, 0x26, 0xF0, 
-		0x01, 0x06, 0x0F, 0x4F, 0x3E, 0x71, 0x01, 0xF4, 
-		0x7F, 0x46, 0x1E, 0xB1, 0x0B, 0x4E, 0x4E, 0x44, 
-		0x31, 0x60, 0x09, 0xE0, 0x0B, 0x4E, 0x4E, 0x44, 
-		0x36, 0x68, 0x32, 0x44, 0x09, 0x4E, 0x4E, 0x44, 
-		0x36, 0x68, 0xA4, 0x1B, 0x00, 0x2C, 0xC0, 0xD1, 
-		0x00, 0xBF, 0x00, 0xBE, 0x00, 0xBF, 0xDD, 0xE7, 
-		0x44, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 
-		0x4C, 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00, 
-		0x00, 0xC0, 0x01, 0x40, 0x50, 0x00, 0x00, 0x00, 
-		0xA0, 0x86, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-		0x00, 0x00, 0x00, 0x00, 
+		0xF0, 0xB5, 0x00, 0x22, 0x00, 0x23, 0x00, 0x24,
+		0x00, 0x20, 0x00, 0x21, 0x00, 0x25, 0x28, 0x4E,
+		0x4E, 0x44, 0x32, 0x68, 0x27, 0x4E, 0x4E, 0x44,
+		0x33, 0x68, 0x27, 0x4E, 0x4E, 0x44, 0x34, 0x68,
+		0x00, 0x26, 0x26, 0x4F, 0x4F, 0x44, 0x3E, 0x60,
+		0x3C, 0xE0, 0x25, 0x4E, 0xF2, 0x60, 0x00, 0x20,
+		0x06, 0xE0, 0x40, 0xCB, 0xDF, 0xF8, 0x88, 0xC0,
+		0x0C, 0xEB, 0x80, 0x07, 0x3E, 0x61, 0x40, 0x1C,
+		0x20, 0x4E, 0x4E, 0x44, 0x36, 0x68, 0xB0, 0xEB,
+		0x96, 0x0F, 0xF2, 0xD3, 0x00, 0x26, 0x1C, 0x4F,
+		0x3E, 0x71, 0x01, 0x26, 0x3E, 0x71, 0x3E, 0x46,
+		0x31, 0x89, 0x31, 0x89, 0x31, 0x89, 0x1A, 0x4D,
+		0x31, 0x89, 0x00, 0xBF, 0x2E, 0x1E, 0xA5, 0xF1,
+		0x01, 0x05, 0x00, 0xD1, 0xF0, 0xBD, 0x14, 0x4E,
+		0x31, 0x89, 0x01, 0xF0, 0x01, 0x06, 0x00, 0x2E,
+		0xF4, 0xD1, 0x11, 0x4E, 0x36, 0x79, 0x26, 0xF0,
+		0x01, 0x06, 0x0F, 0x4F, 0x3E, 0x71, 0x01, 0xF4,
+		0x7F, 0x46, 0x1E, 0xB1, 0x0B, 0x4E, 0x4E, 0x44,
+		0x31, 0x60, 0x09, 0xE0, 0x0B, 0x4E, 0x4E, 0x44,
+		0x36, 0x68, 0x32, 0x44, 0x09, 0x4E, 0x4E, 0x44,
+		0x36, 0x68, 0xA4, 0x1B, 0x00, 0x2C, 0xC0, 0xD1,
+		0x00, 0xBF, 0x00, 0xBE, 0x00, 0xBF, 0xDD, 0xE7,
+		0x44, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00,
+		0x4C, 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00,
+		0x00, 0xC0, 0x01, 0x40, 0x50, 0x00, 0x00, 0x00,
+		0xA0, 0x86, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
 	};
 
 	/* Get working area for code */
-	result = target_alloc_working_area(	target,
-											sizeof(write_code),
-											&algorithm);
+	result = target_alloc_working_area(target,
+										sizeof(write_code),
+										&algorithm);
 	if (result != ERROR_OK) {
 		LOG_DEBUG("target_alloc_working_area() = %d\n", result);
 		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	}
 
 	/* Transfer write program to RAM */
-	result = target_write_buffer(	target,
-									algorithm->address,
-									sizeof(write_code),
-									write_code);
+	result = target_write_buffer(target,
+								algorithm->address,
+								sizeof(write_code),
+								write_code);
 	if (result != ERROR_OK) {
 		LOG_DEBUG("target_write_buffer() = %d\n", result);
 		target_free_working_area(target, algorithm);
@@ -478,12 +467,12 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 
 	/* Get working area for data */
 	buffer_size	= 4 * 1024;
-	result		= ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
+	result = ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	while (result != ERROR_OK) {
 		result = target_alloc_working_area_try(target, buffer_size, &source);
-		if (result == ERROR_OK) {
+		if (result == ERROR_OK)
 			break;
-		}
+
 		buffer_size /= 2;
 		if (buffer_size < 256) {
 			LOG_DEBUG("target_alloc_working_area_try() = %d\n", result);
@@ -556,16 +545,15 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	/* Program in units */
 	remain_size		= count;
 	write_address	= bank->base + offset;
-	write_data		= (uint8_t*)buffer;
+	write_data		= (uint8_t *)buffer;
 	write_size		= buffer_size;
 
 	while (remain_size != 0) {
-		if (remain_size < buffer_size) {
+		if (remain_size < buffer_size)
 			write_size = remain_size;
-		}
 
-		LOG_INFO(	"Program at 0x%08x to 0x%08x", 
-					write_address, (write_address + write_size -1));
+		LOG_INFO("Program at 0x%08x to 0x%08x",
+				write_address, (write_address + write_size - 1));
 
 		/**
 		 *	Set parameter
@@ -579,34 +567,33 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 		mem_params32[0] = write_address;
 		mem_params32[2] = write_size;
 		mem_params32[4] = 0;
-		target_buffer_set_u32_array(	target,
-										mem_params8,
-										ARRAY_SIZE(mem_params32),
-										mem_params32);
-		result = target_write_buffer(
-						target,
-						algorithm->address + sizeof(write_code) - 0x14,
-						16,
-						mem_params8);
+		target_buffer_set_u32_array(target,
+									mem_params8,
+									ARRAY_SIZE(mem_params32),
+									mem_params32);
+		result = target_write_buffer(target,
+									algorithm->address + sizeof(write_code) - 0x14,
+									16,
+									mem_params8);
 		if (result != ERROR_OK) {
 			LOG_DEBUG("target_write_buffer() = %d\n", result);
 			break;
 		}
 
 		/* Set parameter (Write data) */
-		result = target_write_buffer(	target,
-										source->address,
-										write_size,
-										write_data);
+		result = target_write_buffer(target,
+									source->address,
+									write_size,
+									write_data);
 		if (result != ERROR_OK) {
 			LOG_DEBUG("target_write_buffer() = %d\n", result);
 			break;
 		}
 
 		/* Run program */
-		armv7m_info.common_magic	= ARMV7M_COMMON_MAGIC;
-		armv7m_info.core_mode		= ARM_MODE_THREAD;
-		result = target_run_algorithm(	target,
+		armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
+		armv7m_info.core_mode = ARM_MODE_THREAD;
+		result = target_run_algorithm(target,
 										0, NULL,
 										ARRAY_SIZE(reg_params), reg_params,
 										algorithm->address,
@@ -620,10 +607,9 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 		}
 
 		/* Get status */
-		result = target_read_u32(
-						target,
-						algorithm->address + sizeof(write_code) - 4,
-						&status);
+		result = target_read_u32(target,
+								algorithm->address + sizeof(write_code) - 4,
+								&status);
 		if (result != ERROR_OK) {
 			LOG_DEBUG("target_read_u32() = %d\n", result);
 			break;
@@ -696,9 +682,9 @@ static int km1m7xx_get_cpu_type_km1m7ab(struct target *target, const struct km1m
 
 	/* Read Option register */
 	retval = target_read_u32(target, 0x4001C160, &opt_reg00);
-	if (retval != ERROR_OK) {
+	if (retval != ERROR_OK)
 		return ERROR_FAIL;
-	}
+
 	iflash_size = ((opt_reg00 & 0x00FF0000) >> 4);
 
 	/* Search cpu type */
@@ -726,16 +712,16 @@ static int km1m7xx_probe(struct flash_bank *bank)
 
 	/* Read PartID */
 	retval = target_read_u32(target, KM1MXXX_SYS_BASE, &part_id);
-	if ((retval != ERROR_OK) || (part_id == 0x00000000)) {
+	if (retval != ERROR_OK || part_id == 0x00000000) {
 		/**
 		 * Run km1mxxx_probe() again later
 		 * by leaving flash_bank_info->probed=0.
 		 **/
 		return ERROR_OK;
 	}
-	
-	if ((part_id == 0x00000001) || (part_id == 0x00000003)) {
-		/* For KM1M7A/B, read the initial value(0x00000001 or 0x00000003) 
+
+	if (part_id == 0x00000001 || part_id == 0x00000003) {
+		/* For KM1M7A/B, read the initial value(0x00000001 or 0x00000003)
 		   of CHIPCKCTR(0x40000000). */
 		retval = km1m7xx_get_cpu_type_km1m7ab(target, &cpu);
 	} else {
@@ -752,10 +738,9 @@ static int km1m7xx_probe(struct flash_bank *bank)
 		LOG_ERROR("NuMicro flash driver: Failed to detect flash size\n");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
-	if (cpu->flash_type == KM1M7XX_FLASH_TYPE_KM1M7C) {
+	if (cpu->flash_type == KM1M7XX_FLASH_TYPE_KM1M7C)
 		flash_sector_size = FLASH_SECTOR_SIZE_8K;
-	}
-	
+
 	bank->size			= flash_size;
 	bank->num_sectors	= bank->size / flash_sector_size;
 	bank->sectors		= malloc(sizeof(struct flash_sector) * bank->num_sectors);
@@ -804,10 +789,10 @@ static int km1m7xx_auto_probe(struct flash_bank *bank)
 {
 	struct km1mxxx_flash_bank *flash_bank_info = bank->driver_priv;
 
-	if (flash_bank_info->probed) {
+	if (flash_bank_info->probed)
 		return ERROR_OK;
-	}
-	return(km1m7xx_probe(bank));
+
+	return km1m7xx_probe(bank);
 }
 
 COMMAND_HANDLER(km1m7xx_handle_erase_all_sectors_command)
@@ -816,16 +801,14 @@ COMMAND_HANDLER(km1m7xx_handle_erase_all_sectors_command)
 	int					result;
 
 	/* Erase all sectors of each bank */
-	for (bank = flash_bank_list(); bank != NULL; bank = bank->next) {
-
+	for (bank = flash_bank_list(); bank; bank = bank->next) {
 		/* Get bank information */
 		get_flash_bank_by_name(bank->name, &bank);
 
 		/* Erase all sectors */
 		result = km1m7xx_erase(bank, 0, (bank->num_sectors - 1));
-		if (result != ERROR_OK) {
+		if (result != ERROR_OK)
 			return result;
-		}
 	}
 
 	return ERROR_OK;

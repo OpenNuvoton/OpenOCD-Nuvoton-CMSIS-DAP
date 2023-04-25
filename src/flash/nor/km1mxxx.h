@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /***************************************************************************
  *   Copyright (C) 2022 by Nuvoton Technology Corporation Japan            *
  *   Naotoshi Izumi <izumi.naotoshi@nuvoton.com>                           *
