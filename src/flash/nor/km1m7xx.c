@@ -139,7 +139,7 @@ static const struct km1mxxx_cpu_type km1m7xx_parts[] = {
 };
 
 /* Definition for static variable  */
-static uint32_t backup_ccr = 0;
+static uint32_t backup_ccr;
 
 /* Definition for static functions */
 static int km1m7xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_type **cpu);
@@ -270,7 +270,7 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 {
 	uint32_t	read_fwcnt		= 0;
 	uint32_t	read_fmon		= 0;
-	uint32_t	timeout			= 0;
+	uint64_t	timeout			= 0;
 	uint32_t	sector_index	= 0;
 	uint32_t	address			= 0;
 	uint32_t	flash_type		= KM1M7XX_FLASH_TYPE_KM1M7AB;
