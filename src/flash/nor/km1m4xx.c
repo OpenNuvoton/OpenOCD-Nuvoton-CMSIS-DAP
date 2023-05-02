@@ -149,7 +149,7 @@ static int km1m4xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 {
 	uint32_t	read_fwcnt		= 0;
 	uint32_t	read_fmon		= 0;
-	uint32_t	timeout			= 0;
+	uint64_t	timeout			= 0;
 	uint32_t	sector_index	= 0;
 	uint32_t	address			= 0;
 
