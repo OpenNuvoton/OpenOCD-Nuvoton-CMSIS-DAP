@@ -24,6 +24,7 @@ noinst_LTLIBRARIES += %D%/libtarget.la
 	$(ESIRISC_SRC) \
         $(ARC_SRC) \
 	$(KM1Mx_SRC) \
+	$(NUMICRO_SRC) \
 	%D%/avrt.c \
 	%D%/dsp563xx.c \
 	%D%/dsp563xx_once.c \
@@ -157,6 +158,9 @@ ARC_SRC = \
 KM1Mx_SRC = \
 	%D%/km1m7xx.c \
 	%D%/km1m4xx.c
+
+NUMICRO_SRC = \
+	%D%/numicrom23.c
 
 %C%_libtarget_la_SOURCES += \
 	%D%/algorithm.h \

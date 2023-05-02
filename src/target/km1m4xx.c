@@ -627,20 +627,21 @@ static int cortex_m_examine_debug_reason(struct target *target)
 	/* THIS IS NOT GOOD, TODO - better logic for detection of debug state reason
 	 * only check the debug reason if we don't know it already */
 
-	if ((target->debug_reason != DBG_REASON_DBGRQ)
-		&& (target->debug_reason != DBG_REASON_SINGLESTEP)) {
+	if (target->debug_reason != DBG_REASON_DBGRQ
+		&& target->debug_reason != DBG_REASON_SINGLESTEP) {
 		if (cortex_m->nvic_dfsr & DFSR_BKPT) {
 			target->debug_reason = DBG_REASON_BREAKPOINT;
 			if (cortex_m->nvic_dfsr & DFSR_DWTTRAP)
 				target->debug_reason = DBG_REASON_WPTANDBKPT;
-		} else if (cortex_m->nvic_dfsr & DFSR_DWTTRAP)
+		} else if (cortex_m->nvic_dfsr & DFSR_DWTTRAP) {
 			target->debug_reason = DBG_REASON_WATCHPOINT;
-		else if (cortex_m->nvic_dfsr & DFSR_VCATCH)
+		} else if (cortex_m->nvic_dfsr & DFSR_VCATCH) {
 			target->debug_reason = DBG_REASON_BREAKPOINT;
-		else if (cortex_m->nvic_dfsr & DFSR_EXTERNAL)
+		} else if (cortex_m->nvic_dfsr & DFSR_EXTERNAL) {
 			target->debug_reason = DBG_REASON_DBGRQ;
-		else	/* HALTED */
+		} else {	/* HALTED */
 			target->debug_reason = DBG_REASON_UNDEFINED;
+		}
 	}
 
 	return ERROR_OK;
@@ -784,7 +785,7 @@ static int cortex_m_debug_entry(struct target *target)
 		arm->core_mode = ARM_MODE_HANDLER;
 		arm->map = armv7m_msp_reg_map;
 	} else {
-		unsigned control = buf_get_u32(arm->core_cache
+		unsigned int control = buf_get_u32(arm->core_cache
 				->reg_list[ARMV7M_CONTROL].value, 0, 3);
 
 		/* is this thread privileged? */
@@ -881,7 +882,7 @@ static int cortex_m_poll_one(struct target *target)
 	if (cortex_m->dcb_dhcsr & S_HALT) {
 		target->state = TARGET_HALTED;
 
-		if ((prev_target_state == TARGET_RUNNING) || (prev_target_state == TARGET_RESET)) {
+		if (prev_target_state == TARGET_RUNNING || prev_target_state == TARGET_RESET) {
 			retval = cortex_m_debug_entry(target);
 
 			/* arm_semihosting needs to know registers, don't run if debug entry returned error */
@@ -919,7 +920,7 @@ static int cortex_m_poll_one(struct target *target)
 	}
 
 	/* Check that target is truly halted, since the target could be resumed externally */
-	if ((prev_target_state == TARGET_HALTED) && !(cortex_m->dcb_dhcsr & S_HALT)) {
+	if (prev_target_state == TARGET_HALTED && !(cortex_m->dcb_dhcsr & S_HALT)) {
 		/* registers are now invalid */
 		register_cache_invalidate(armv7m->arm.core_cache);
 
@@ -1365,7 +1366,7 @@ static int cortex_m_step(struct target *target, int current,
 	/* if no bkpt instruction is found at pc then we can perform
 	 * a normal step, otherwise we have to manually step over the bkpt
 	 * instruction - as such simulate a step */
-	if (bkpt_inst_found == false) {
+	if (!bkpt_inst_found) {
 		if (cortex_m->isrmasking_mode != CORTEX_M_ISRMASK_AUTO) {
 			/* Automatic ISR masking mode off: Just step over the next
 			 * instruction, with interrupts on or off as appropriate. */
@@ -1414,7 +1415,6 @@ static int cortex_m_step(struct target *target, int current,
 				cortex_m_write_debug_halt_mask(target, C_HALT, 0);
 				cortex_m_set_maskints_for_halt(target);
 			} else {
-
 				/* Set a temporary break point */
 				if (breakpoint) {
 					retval = cortex_m_set_breakpoint(target, breakpoint);
@@ -1454,9 +1454,9 @@ static int cortex_m_step(struct target *target, int current,
 					} while (!((cortex_m->dcb_dhcsr & S_HALT) || isr_timed_out));
 
 					/* only remove breakpoint if we created it */
-					if (breakpoint)
+					if (breakpoint) {
 						cortex_m_unset_breakpoint(target, breakpoint);
-					else {
+					} else {
 						/* Remove the temporary breakpoint */
 						breakpoint_remove(target, pc_value);
 					}
@@ -1787,7 +1787,7 @@ static int cortex_m_read_memory(struct target *target, target_addr_t address,
 
 	if (armv7m->arm.arch == ARM_ARCH_V6M) {
 		/* armv6m does not handle unaligned memory access */
-		if (((size == 4) && (address & 0x3u)) || ((size == 2) && (address & 0x1u)))
+		if ((size == 4 && (address & 0x3u)) || (size == 2 && (address & 0x1u)))
 			return ERROR_TARGET_UNALIGNED_ACCESS;
 	}
 
@@ -1801,7 +1801,7 @@ static int cortex_m_write_memory(struct target *target, target_addr_t address,
 
 	if (armv7m->arm.arch == ARM_ARCH_V6M) {
 		/* armv6m does not handle unaligned memory access */
-		if (((size == 4) && (address & 0x3u)) || ((size == 2) && (address & 0x1u)))
+		if ((size == 4 && (address & 0x3u)) || (size == 2 && (address & 0x1u)))
 			return ERROR_TARGET_UNALIGNED_ACCESS;
 	}
 
@@ -1978,7 +1978,7 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 
 	static const struct {
 		char name[10];
-		unsigned mask;
+		unsigned int mask;
 	} vec_ids[] = {
 		{ "hard_err",   VC_HARDERR, },
 		{ "int_err",    VC_INTERR, },
@@ -2004,7 +2004,7 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 		return retval;
 
 	if (CMD_ARGC > 0) {
-		unsigned catch = 0;
+		unsigned int catch = 0;
 
 		if (CMD_ARGC == 1) {
 			if (strcmp(CMD_ARGV[0], "all") == 0) {
@@ -2012,11 +2012,12 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 					| VC_STATERR | VC_CHKERR | VC_NOCPERR
 					| VC_MMERR | VC_CORERESET;
 				goto write;
-			} else if (strcmp(CMD_ARGV[0], "none") == 0)
+			} else if (strcmp(CMD_ARGV[0], "none") == 0) {
 				goto write;
+			}
 		}
 		while (CMD_ARGC-- > 0) {
-			unsigned i;
+			unsigned int i;
 			for (i = 0; i < ARRAY_SIZE(vec_ids); i++) {
 				if (strcmp(CMD_ARGV[CMD_ARGC], vec_ids[i].name) != 0)
 					continue;
@@ -2049,7 +2050,7 @@ write:
 		 */
 	}
 
-	for (unsigned i = 0; i < ARRAY_SIZE(vec_ids); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(vec_ids); i++) {
 		command_print(CMD, "%9s: %s", vec_ids[i].name,
 			(demcr & vec_ids[i].mask) ? "catch" : "ignore");
 	}
@@ -2108,18 +2109,18 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 		return retval;
 
 	if (CMD_ARGC > 0) {
-		if (strcmp(*CMD_ARGV, "sysresetreq") == 0)
+		if (strcmp(*CMD_ARGV, "sysresetreq") == 0) {
 			cortex_m->soft_reset_config = CORTEX_M_RESET_SYSRESETREQ;
-
-		else if (strcmp(*CMD_ARGV, "vectreset") == 0) {
+		} else if (strcmp(*CMD_ARGV, "vectreset") == 0) {
 			if (target_was_examined(target)
 					&& !cortex_m->vectreset_supported)
 				LOG_TARGET_WARNING(target, "VECTRESET is not supported on your Cortex-M core!");
 			else
 				cortex_m->soft_reset_config = CORTEX_M_RESET_VECTRESET;
 
-		} else
+		} else {
 			return ERROR_COMMAND_SYNTAX_ERROR;
+		}
 	}
 
 	switch (cortex_m->soft_reset_config) {

@@ -105,6 +105,7 @@ extern struct target_type esirisc_target;
 extern struct target_type arcv2_target;
 extern struct target_type km1m7xx_target;
 extern struct target_type km1m4xx_target;
+extern struct target_type numicrom23_target;
 
 static struct target_type *target_types[] = {
 	&arm7tdmi_target,
@@ -146,6 +147,7 @@ static struct target_type *target_types[] = {
 	&mips_mips64_target,
 	&km1m7xx_target,
 	&km1m4xx_target,
+	&numicrom23_target,
 	NULL,
 };
 
