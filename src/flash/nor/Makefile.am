@@ -91,6 +91,7 @@ NORHEADERS = \
 	%D%/cfi.h \
 	%D%/driver.h \
 	%D%/imp.h \
+	%D%/km1mxxx.h \
 	%D%/non_cfi.h \
 	%D%/ocl.h \
 	%D%/sfdp.h \
