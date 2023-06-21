@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-/***************************************************************************
- *   Copyright (C) 2005 by Dominic Rath                                    *
- *   Dominic.Rath@gmx.de                                                   *
- *                                                                         *
- *   Copyright (C) 2006 by Magnus Lundin                                   *
- *   lundin@mlu.mine.nu                                                    *
- *                                                                         *
- *   Copyright (C) 2008 by Spencer Oliver                                  *
- *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *                                                                         *
- *   Cortex-M3(tm) TRM, ARM DDI 0337E (r1p1) and 0337G (r2p0)              *
- *                                                                         *
- *-------------------------------------------------------------------------*
- *                                                                         *
- *   This file is based on cortex_m.c and adds functionality for the       *
- *   Nuvoton NUMICROM23 series.This file was created based on cortex_m.c.  *
- *                                                                         *
- *   Copyright (C) 2023 by Nuvoton Technology Corporation                  *
- *   ccli0 <ccli0@nuvoton.com>                                             *
- *                                                                         *
- ***************************************************************************/
+/**************************************************************************
+*   Copyright (C) 2005 by Dominic Rath                                    *
+*   Dominic.Rath@gmx.de                                                   *
+*                                                                         *
+*   Copyright (C) 2006 by Magnus Lundin                                   *
+*   lundin@mlu.mine.nu                                                    *
+*                                                                         *
+*   Copyright (C) 2008 by Spencer Oliver                                  *
+*   spen@spen-soft.co.uk                                                  *
+*                                                                         *
+*                                                                         *
+*   Cortex-M3(tm) TRM, ARM DDI 0337E (r1p1) and 0337G (r2p0)              *
+*                                                                         *
+*-------------------------------------------------------------------------*
+*                                                                         *
+*   This file is based on cortex_m.c and adds functionality for the       *
+*   Nuvoton NUMICRO series.This file was created based on cortex_m.c.     *
+*                                                                         *
+*   Copyright (C) 2023 by Nuvoton Technology Corporation                  *
+*   ccli0 <ccli0@nuvoton.com>                                             *
+*                                                                         *
+**************************************************************************/
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -1899,8 +1899,8 @@ static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 	return ERROR_OK;
 }
 
-struct target_type numicrom23_target = {
-	.name = "numicrom23",
+struct target_type numicro_dap_target = {
+	.name = "numicro_dap",
 
 	.poll = cortex_m_poll,
 	.arch_state = armv7m_arch_state,

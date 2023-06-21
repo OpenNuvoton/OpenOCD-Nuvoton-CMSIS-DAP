@@ -160,7 +160,7 @@ KM1Mx_SRC = \
 	%D%/km1m4xx.c
 
 NUMICRO_SRC = \
-	%D%/numicrom23.c
+	%D%/numicro_dap.c
 
 %C%_libtarget_la_SOURCES += \
 	%D%/algorithm.h \

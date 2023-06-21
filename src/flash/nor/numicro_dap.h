@@ -18,39 +18,43 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
-#ifndef OPENOCD_FLASH_NOR_NUMICROM23_H
-#define OPENOCD_FLASH_NOR_NUMICROM23_H
+#ifndef OPENOCD_FLASH_NOR_NUMICRO_DAP_H
+#define OPENOCD_FLASH_NOR_NUMICRO_DAP_H
 
-/* Nuvoton NUMICROM23 Series register locations */
-#define NUMICROM23_SYS_BASE			0x40000000
+/* Nuvoton NUMICROM Series register locations */
+#define NUMICRO_AHB5_SYS_BASE		0x50000000
+#define NUMICRO_AHB4_SYS_BASE		0x40000000
 
 /* Definition for Erase timeout */
 #define	TIMEOUT_ERASE				100000
 
 /* Definition for Flash Memory */
-#define	FLASH_SECTOR_SIZE_4K		0x00001000
+#define	SECTOR_SIZE_512		0x00000200
+#define	SECTOR_SIZE_2K		0x00000800
+#define	SECTOR_SIZE_4K		0x00001000
 
 /* flash MAX banks */
-#define NUMICROM23_MAX_FLASH_BANKS		2
+#define NUMICRO_DAP_MAX_FLASH_BANKS		2
 
 /* flash bank structs */
-struct numicrom23_flash_bank_type {
+struct numicro_dap_flash_bank_type {
 	uint32_t base;
 	uint32_t size;
 };
 
 /* part structs */
-struct numicrom23_cpu_type {
+struct numicro_dap_cpu_type {
 	char *partname;
 	uint32_t partid;
 	unsigned int flash_type;
 	unsigned int n_banks;
-	struct numicrom23_flash_bank_type bank[NUMICROM23_MAX_FLASH_BANKS];
+	struct numicro_dap_flash_bank_type bank[NUMICRO_DAP_MAX_FLASH_BANKS];
+	unsigned int page_size;
 };
 
-struct numicrom23_flash_bank {
+struct numicro_dap_flash_bank {
 	int		probed;
-	const struct numicrom23_cpu_type *cpu;
+	const struct numicro_dap_cpu_type *cpu;
 };
 
-#endif /* OPENOCD_FLASH_NOR_NUMICROM23_H */
+#endif /* OPENOCD_FLASH_NOR_NUMICRO_DAP_H */
