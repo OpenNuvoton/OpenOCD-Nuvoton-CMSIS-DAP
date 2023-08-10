@@ -25,6 +25,7 @@
 #include "imp.h"
 #include "numicro_dap.h"
 #include <helper/binarybuffer.h>
+#include <helper/bits.h>
 #include <target/algorithm.h>
 #include <target/armv7m.h>
 
@@ -231,6 +232,7 @@ static const struct numicro_dap_cpu_type numicro_dap_parts[] = {
 	{"M463SGCAE", 0x01C46310, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
 	{"M463LGCAE", 0x01C46300, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
 	{"M463YGCAE", 0x01C46390, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
+	{"M463K2GCAC", 0x01C4634E, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
 	{"M460KGCAE", 0x01C46040, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
 	{"M460SGCAE", 0x01C46010, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
 	{"M460LGCAE", 0x01C46000, FLASH_TYPE_M4, NUMICRO_DAP_BANKS_2(256 * 1024, 8 * 1024), SECTOR_SIZE_4K},
@@ -1301,7 +1303,7 @@ static int numicro_dap_auto_probe(struct flash_bank *bank)
 	return numicro_dap_probe(bank);
 }
 
-struct flash_driver numicro_dap_flash = {
+const struct flash_driver numicro_dap_flash = {
 	.name					= "numicro_dap",
 	.usage					= "",
 	.flash_bank_command		= numicro_dap_flash_bank_command,

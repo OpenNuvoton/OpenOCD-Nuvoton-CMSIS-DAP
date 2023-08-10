@@ -1899,6 +1899,24 @@ static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 	return ERROR_OK;
 }
 
+static const struct command_registration cortex_m_command_handlers[] = {
+	{
+		.chain = armv7m_command_handlers,
+	},
+	{
+		.chain = armv7m_trace_command_handlers,
+	},
+	/* START_DEPRECATED_TPIU */
+	{
+		.chain = arm_tpiu_deprecated_command_handlers,
+	},
+	/* END_DEPRECATED_TPIU */
+	{
+		.chain = rtt_target_command_handlers,
+	},
+	COMMAND_REGISTRATION_DONE
+};
+
 struct target_type numicro_dap_target = {
 	.name = "numicro_dap",
 
@@ -1933,6 +1951,7 @@ struct target_type numicro_dap_target = {
 	.remove_watchpoint = cortex_m_remove_watchpoint,
 	.hit_watchpoint = cortex_m_hit_watchpoint,
 
+	.commands = cortex_m_command_handlers,
 	.target_create = cortex_m_target_create,
 	.target_jim_configure = adiv5_jim_configure,
 	.init_target = cortex_m_init_target,
