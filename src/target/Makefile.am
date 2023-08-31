@@ -156,8 +156,9 @@ ARC_SRC = \
         %D%/arc_mem.c
 
 KM1Mx_SRC = \
-	%D%/km1m7xx.c \
-	%D%/km1m4xx.c
+	%D%/km1m0xx.c \
+	%D%/km1m4xx.c \
+	%D%/km1m7xx.c
 
 NUMICRO_SRC = \
 	%D%/numicro_dap.c

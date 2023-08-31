@@ -15,8 +15,8 @@
  *                                                                         *
  *-------------------------------------------------------------------------*
  *                                                                         *
- *   This file is based on cortex_m.c and adds functionality for the       *
- *   Nuvoton KM1M7 series.This file was created based on cortex_m.c.       *
+ *   This file is based on cortex_m.c and adds functions for the Nuvoton   *
+ *   KM1M7 series.                                                         *
  *                                                                         *
  *   Copyright (C) 2021 by Nuvoton Technology Corporation Japan            *
  *   Yoshikazu Yamaguchi <yamaguchi.yoshikazu@nuvoton.com>                 *
@@ -2016,7 +2016,7 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 				goto write;
 			} else if (strcmp(CMD_ARGV[0], "none") == 0) {
 				goto write;
-		}
+			}
 		}
 		while (CMD_ARGC-- > 0) {
 			unsigned int i;
