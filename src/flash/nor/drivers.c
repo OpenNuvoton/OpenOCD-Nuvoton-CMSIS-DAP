@@ -36,8 +36,9 @@ extern const struct flash_driver fespi_flash;
 extern const struct flash_driver jtagspi_flash;
 extern const struct flash_driver kinetis_flash;
 extern const struct flash_driver kinetis_ke_flash;
-extern const struct flash_driver km1m7xx_flash;
+extern const struct flash_driver km1m0xx_flash;
 extern const struct flash_driver km1m4xx_flash;
+extern const struct flash_driver km1m7xx_flash;
 extern const struct flash_driver lpc2000_flash;
 extern const struct flash_driver lpc288x_flash;
 extern const struct flash_driver lpc2900_flash;
@@ -115,8 +116,9 @@ static const struct flash_driver * const flash_drivers[] = {
 	&jtagspi_flash,
 	&kinetis_flash,
 	&kinetis_ke_flash,
-	&km1m7xx_flash,
+	&km1m0xx_flash,
 	&km1m4xx_flash,
+	&km1m7xx_flash,
 	&lpc2000_flash,
 	&lpc288x_flash,
 	&lpc2900_flash,

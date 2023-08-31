@@ -16,10 +16,10 @@
  *-------------------------------------------------------------------------*
  *                                                                         *
  *   This file is based on cortex_m.c and adds functions for the Nuvoton   *
- *   KM1M4 series.                                                         *
+ *   KM1M0 series.                                                         *
  *                                                                         *
- *   Copyright (C) 2022 by Nuvoton Technology Corporation Japan            *
- *   Naotoshi Izumi <izumi.naotoshi@nuvoton.com>                           *
+ *   Copyright (C) 2023 by Nuvoton Technology Corporation Japan            *
+ *   Yoshikazu Yamaguchi <yamaguchi.yoshhikazu@nuvoton.com>                *
  *                                                                         *
  ***************************************************************************/
 #ifdef HAVE_CONFIG_H
@@ -55,8 +55,8 @@
 #define DHCSR_S_REGRDY_TIMEOUT (500)
 
 /* definition for security authentication */
-static uint32_t	km1m4xx_key_set;
-static uint32_t	km1m4xx_key_data[4]	= {	0xffffffff,
+static uint32_t	km1m0xx_key_set;
+static uint32_t	km1m0xx_key_data[4]	= {	0xffffffff,
 										0xffffffff,
 										0xffffffff,
 										0xffffffff};
@@ -627,21 +627,20 @@ static int cortex_m_examine_debug_reason(struct target *target)
 	/* THIS IS NOT GOOD, TODO - better logic for detection of debug state reason
 	 * only check the debug reason if we don't know it already */
 
-	if (target->debug_reason != DBG_REASON_DBGRQ
-		&& target->debug_reason != DBG_REASON_SINGLESTEP) {
+	if ((target->debug_reason != DBG_REASON_DBGRQ)
+		&& (target->debug_reason != DBG_REASON_SINGLESTEP)) {
 		if (cortex_m->nvic_dfsr & DFSR_BKPT) {
 			target->debug_reason = DBG_REASON_BREAKPOINT;
 			if (cortex_m->nvic_dfsr & DFSR_DWTTRAP)
 				target->debug_reason = DBG_REASON_WPTANDBKPT;
-		} else if (cortex_m->nvic_dfsr & DFSR_DWTTRAP) {
+		} else if (cortex_m->nvic_dfsr & DFSR_DWTTRAP)
 			target->debug_reason = DBG_REASON_WATCHPOINT;
-		} else if (cortex_m->nvic_dfsr & DFSR_VCATCH) {
+		else if (cortex_m->nvic_dfsr & DFSR_VCATCH)
 			target->debug_reason = DBG_REASON_BREAKPOINT;
-		} else if (cortex_m->nvic_dfsr & DFSR_EXTERNAL) {
+		else if (cortex_m->nvic_dfsr & DFSR_EXTERNAL)
 			target->debug_reason = DBG_REASON_DBGRQ;
-		} else {	/* HALTED */
+		else	/* HALTED */
 			target->debug_reason = DBG_REASON_UNDEFINED;
-		}
 	}
 
 	return ERROR_OK;
@@ -785,7 +784,7 @@ static int cortex_m_debug_entry(struct target *target)
 		arm->core_mode = ARM_MODE_HANDLER;
 		arm->map = armv7m_msp_reg_map;
 	} else {
-		unsigned int control = buf_get_u32(arm->core_cache
+		unsigned control = buf_get_u32(arm->core_cache
 				->reg_list[ARMV7M_CONTROL].value, 0, 3);
 
 		/* is this thread privileged? */
@@ -882,7 +881,7 @@ static int cortex_m_poll_one(struct target *target)
 	if (cortex_m->dcb_dhcsr & S_HALT) {
 		target->state = TARGET_HALTED;
 
-		if (prev_target_state == TARGET_RUNNING || prev_target_state == TARGET_RESET) {
+		if ((prev_target_state == TARGET_RUNNING) || (prev_target_state == TARGET_RESET)) {
 			retval = cortex_m_debug_entry(target);
 
 			/* arm_semihosting needs to know registers, don't run if debug entry returned error */
@@ -920,7 +919,7 @@ static int cortex_m_poll_one(struct target *target)
 	}
 
 	/* Check that target is truly halted, since the target could be resumed externally */
-	if (prev_target_state == TARGET_HALTED && !(cortex_m->dcb_dhcsr & S_HALT)) {
+	if ((prev_target_state == TARGET_HALTED) && !(cortex_m->dcb_dhcsr & S_HALT)) {
 		/* registers are now invalid */
 		register_cache_invalidate(armv7m->arm.core_cache);
 
@@ -1366,7 +1365,7 @@ static int cortex_m_step(struct target *target, int current,
 	/* if no bkpt instruction is found at pc then we can perform
 	 * a normal step, otherwise we have to manually step over the bkpt
 	 * instruction - as such simulate a step */
-	if (!bkpt_inst_found) {
+	if (bkpt_inst_found == false) {
 		if (cortex_m->isrmasking_mode != CORTEX_M_ISRMASK_AUTO) {
 			/* Automatic ISR masking mode off: Just step over the next
 			 * instruction, with interrupts on or off as appropriate. */
@@ -1415,6 +1414,7 @@ static int cortex_m_step(struct target *target, int current,
 				cortex_m_write_debug_halt_mask(target, C_HALT, 0);
 				cortex_m_set_maskints_for_halt(target);
 			} else {
+
 				/* Set a temporary break point */
 				if (breakpoint) {
 					retval = cortex_m_set_breakpoint(target, breakpoint);
@@ -1454,9 +1454,9 @@ static int cortex_m_step(struct target *target, int current,
 					} while (!((cortex_m->dcb_dhcsr & S_HALT) || isr_timed_out));
 
 					/* only remove breakpoint if we created it */
-					if (breakpoint) {
+					if (breakpoint)
 						cortex_m_unset_breakpoint(target, breakpoint);
-					} else {
+					else {
 						/* Remove the temporary breakpoint */
 						breakpoint_remove(target, pc_value);
 					}
@@ -1513,7 +1513,7 @@ static int cortex_m_step(struct target *target, int current,
 	return ERROR_OK;
 }
 
-static int km1m4xx_m_assert_reset(struct target *target)
+static int cortex_m_assert_reset(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 	struct armv7m_common *armv7m = &cortex_m->armv7m;
@@ -1573,47 +1573,6 @@ static int km1m4xx_m_assert_reset(struct target *target)
 			return ERROR_FAIL;
 		}
 	}
-
-	/* Start of original procedure for km1m4xx series */
-	uint32_t	optreg0	= 0;
-	uint32_t	cpuid	= 0;
-	int			ret		= 0;
-	uint32_t	optreg0_key	= 0x672c0000;
-
-	/* Disable WDT */
-	ret = target_read_u32(target, 0xf0102010, &optreg0);
-	if (ret != ERROR_OK)
-		return ret;
-
-	ret = target_write_u32(target, 0xf0102010, ((optreg0 & 0xffff) | optreg0_key | 0x00000004));
-	if (ret != ERROR_OK)
-		return ret;
-
-	/* When CPUID is 0x00000000, it may be security locked. */
-	ret = target_read_u32(target, 0xe000ed00, &cpuid);
-	if (ret != ERROR_OK)
-		return ret;
-
-	LOG_INFO("CPUID = 0x%08x\n", cpuid);
-	if (cpuid == 0 && km1m4xx_key_set == 1) {
-		/* Unlock DAP */
-		target_write_u32(target, 0xf0102000, km1m4xx_key_data[0]);
-		target_write_u32(target, 0xf0102004, km1m4xx_key_data[1]);
-		target_write_u32(target, 0xf0102008, km1m4xx_key_data[2]);
-		target_write_u32(target, 0xf010200c, km1m4xx_key_data[3]);
-
-		/* Still if the CPUID is 0x00000000, the security can not be unlocked */
-		ret = target_read_u32(target, 0xe000ed00, &cpuid);
-		if (ret != ERROR_OK)
-			return ret;
-
-		LOG_INFO("CPUID = 0x%08x\n", cpuid);
-		if (cpuid == 0x00000000) {
-			LOG_ERROR("Cannot unlock security");
-			return ERROR_FAIL;
-		}
-	}
-	/* End of original procedure for km1m4xx series */
 
 	/* Enable debug requests */
 	int retval = cortex_m_read_dhcsr_atomic_sticky(target);
@@ -1724,7 +1683,7 @@ static int km1m4xx_m_assert_reset(struct target *target)
 	return ERROR_OK;
 }
 
-static int cortex_m_deassert_reset(struct target *target)
+static int km1m0xx_deassert_reset(struct target *target)
 {
 	struct armv7m_common *armv7m = &target_to_cm(target)->armv7m;
 
@@ -1747,6 +1706,62 @@ static int cortex_m_deassert_reset(struct target *target)
 			return retval;
 		}
 	}
+
+	/* Start of original procedure for km1m0xx series */
+	uint32_t demcr;
+	uint32_t optreg0 = 0;
+	uint32_t cpuid = 0;
+	int ret = 0;
+	uint32_t optreg0_key = 0x672c0000;
+	int retry = 10;
+	struct cortex_m_common *cortex_m = target_to_cm(target);
+
+	/* Disable WDT */
+	ret = target_read_u32(target, 0xf0102010, &optreg0);
+	if (ret != ERROR_OK)
+		return ret;
+
+	ret = target_write_u32(target, 0xf0102010, ((optreg0 & 0xffff) | optreg0_key | 0x00000004));
+	if (ret != ERROR_OK)
+		return ret;
+
+	/* When CPUID is 0x00000000, it may be security locked. */
+	ret = target_read_u32(target, CPUID, &cpuid);
+	if (ret != ERROR_OK)
+		cpuid = 0;
+
+	LOG_TARGET_INFO(target, "CPUID = 0x%08x\n", cpuid);
+	if (cpuid == 0 && km1m0xx_key_set == 1) {
+		/* Unlock DAP */
+		target_write_u32(target, 0xf0102000, km1m0xx_key_data[0]);
+		target_write_u32(target, 0xf0102004, km1m0xx_key_data[1]);
+		target_write_u32(target, 0xf0102008, km1m0xx_key_data[2]);
+		target_write_u32(target, 0xf010200c, km1m0xx_key_data[3]);
+
+		/* Still if the CPUID is 0x00000000, the security can not be unlocked */
+		ret = target_read_u32(target, CPUID, &cpuid);
+		if (ret != ERROR_OK)
+			return ret;
+
+		LOG_TARGET_INFO(target, "CPUID = 0x%08x\n", cpuid);
+		if (cpuid == 0x00000000) {
+			LOG_TARGET_ERROR(target, "Cannot unlock security");
+			return ERROR_FAIL;
+		}
+	}
+
+	/* Check that "DHCSR.C_DEBUGEN" and "DEMCR.VC_CORERESET" are set. */
+	for (retry = 10; retry > 0; retry--) {
+		ret = cortex_m_read_dhcsr_atomic_sticky(target);
+		if (cortex_m->dcb_dhcsr & C_DEBUGEN) {
+			break;
+		}
+		ret = cortex_m_write_debug_halt_mask(target, 0, C_HALT | C_STEP | C_MASKINTS);
+		ret = mem_ap_read_atomic_u32(armv7m->debug_ap, DCB_DEMCR, &demcr);
+		if (ret == ERROR_OK)
+			ret = mem_ap_write_u32(armv7m->debug_ap, DCB_DEMCR, demcr | VC_CORERESET);
+	}
+	/* End of original procedure for km1m0xx series */
 
 	return ERROR_OK;
 }
@@ -1787,7 +1802,7 @@ static int cortex_m_read_memory(struct target *target, target_addr_t address,
 
 	if (armv7m->arm.arch == ARM_ARCH_V6M) {
 		/* armv6m does not handle unaligned memory access */
-		if ((size == 4 && (address & 0x3u)) || (size == 2 && (address & 0x1u)))
+		if (((size == 4) && (address & 0x3u)) || ((size == 2) && (address & 0x1u)))
 			return ERROR_TARGET_UNALIGNED_ACCESS;
 	}
 
@@ -1801,7 +1816,7 @@ static int cortex_m_write_memory(struct target *target, target_addr_t address,
 
 	if (armv7m->arm.arch == ARM_ARCH_V6M) {
 		/* armv6m does not handle unaligned memory access */
-		if ((size == 4 && (address & 0x3u)) || (size == 2 && (address & 0x1u)))
+		if (((size == 4) && (address & 0x3u)) || ((size == 2) && (address & 0x1u)))
 			return ERROR_TARGET_UNALIGNED_ACCESS;
 	}
 
@@ -1978,7 +1993,7 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 
 	static const struct {
 		char name[10];
-		unsigned int mask;
+		unsigned mask;
 	} vec_ids[] = {
 		{ "hard_err",   VC_HARDERR, },
 		{ "int_err",    VC_INTERR, },
@@ -2004,7 +2019,7 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 		return retval;
 
 	if (CMD_ARGC > 0) {
-		unsigned int catch = 0;
+		unsigned catch = 0;
 
 		if (CMD_ARGC == 1) {
 			if (strcmp(CMD_ARGV[0], "all") == 0) {
@@ -2012,12 +2027,11 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 					| VC_STATERR | VC_CHKERR | VC_NOCPERR
 					| VC_MMERR | VC_CORERESET;
 				goto write;
-			} else if (strcmp(CMD_ARGV[0], "none") == 0) {
+			} else if (strcmp(CMD_ARGV[0], "none") == 0)
 				goto write;
-			}
 		}
 		while (CMD_ARGC-- > 0) {
-			unsigned int i;
+			unsigned i;
 			for (i = 0; i < ARRAY_SIZE(vec_ids); i++) {
 				if (strcmp(CMD_ARGV[CMD_ARGC], vec_ids[i].name) != 0)
 					continue;
@@ -2050,7 +2064,7 @@ write:
 		 */
 	}
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(vec_ids); i++) {
+	for (unsigned i = 0; i < ARRAY_SIZE(vec_ids); i++) {
 		command_print(CMD, "%9s: %s", vec_ids[i].name,
 			(demcr & vec_ids[i].mask) ? "catch" : "ignore");
 	}
@@ -2109,18 +2123,18 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 		return retval;
 
 	if (CMD_ARGC > 0) {
-		if (strcmp(*CMD_ARGV, "sysresetreq") == 0) {
+		if (strcmp(*CMD_ARGV, "sysresetreq") == 0)
 			cortex_m->soft_reset_config = CORTEX_M_RESET_SYSRESETREQ;
-		} else if (strcmp(*CMD_ARGV, "vectreset") == 0) {
+
+		else if (strcmp(*CMD_ARGV, "vectreset") == 0) {
 			if (target_was_examined(target)
 					&& !cortex_m->vectreset_supported)
 				LOG_TARGET_WARNING(target, "VECTRESET is not supported on your Cortex-M core!");
 			else
 				cortex_m->soft_reset_config = CORTEX_M_RESET_VECTRESET;
 
-		} else {
+		} else
 			return ERROR_COMMAND_SYNTAX_ERROR;
-		}
 	}
 
 	switch (cortex_m->soft_reset_config) {
@@ -2142,7 +2156,7 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 	return ERROR_OK;
 }
 
-COMMAND_HANDLER(km1m4xx_handle_keycode_file_command)
+COMMAND_HANDLER(km1m0xx_handle_keycode_file_command)
 {
 	FILE *fp_keyfile;
 	char key_str[16];
@@ -2157,16 +2171,16 @@ COMMAND_HANDLER(km1m4xx_handle_keycode_file_command)
 
 	key_count = 0;
 	while (fgets(key_str, 15, fp_keyfile))
-		km1m4xx_key_data[key_count++] = strtoul(key_str, NULL, 16);
+		km1m0xx_key_data[key_count++] = strtoul(key_str, NULL, 16);
 
 	fclose(fp_keyfile);
 
-	km1m4xx_key_set = 1;
+	km1m0xx_key_set = 1;
 
 	return ERROR_OK;
 }
 
-COMMAND_HANDLER(km1m4xx_handle_keycode_data_command)
+COMMAND_HANDLER(km1m0xx_handle_keycode_data_command)
 {
 	char		key_str[16];
 	int			key_count;
@@ -2181,14 +2195,14 @@ COMMAND_HANDLER(km1m4xx_handle_keycode_data_command)
 			key_str[0] = '\0';
 
 		strcat(key_str, CMD_ARGV[key_count]);
-		COMMAND_PARSE_NUMBER(u32, key_str, km1m4xx_key_data[key_count]);
+		COMMAND_PARSE_NUMBER(u32, key_str, km1m0xx_key_data[key_count]);
 	}
 
-	km1m4xx_key_set = 1;
+	km1m0xx_key_set = 1;
 	return ERROR_OK;
 }
 
-static const struct command_registration km1m4xx_subcommand_handlers[] = {
+static const struct command_registration km1m0xx_subcommand_handlers[] = {
 	{
 		.name = "maskisr",
 		.handler = handle_cortex_m_mask_interrupts_command,
@@ -2215,14 +2229,14 @@ static const struct command_registration km1m4xx_subcommand_handlers[] = {
 	},
 	{
 		.name		= "keycode_file",
-		.handler	= km1m4xx_handle_keycode_file_command,
+		.handler	= km1m0xx_handle_keycode_file_command,
 		.mode		= COMMAND_CONFIG,
 		.usage		= "filename",
 		.help		= "Set keycode file for authentication",
 	},
 	{
 		.name		= "keycode_data",
-		.handler	= km1m4xx_handle_keycode_data_command,
+		.handler	= km1m0xx_handle_keycode_data_command,
 		.mode		= COMMAND_CONFIG,
 		.usage		= "keycode0 keycode1 keycode2 keycode3",
 		.help		= "Set 4 keycode data for authentication",
@@ -2230,7 +2244,7 @@ static const struct command_registration km1m4xx_subcommand_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-static const struct command_registration km1m4xx_command_handlers[] = {
+static const struct command_registration km1m0xx_command_handlers[] = {
 	{
 		.chain = armv7m_command_handlers,
 	},
@@ -2238,11 +2252,11 @@ static const struct command_registration km1m4xx_command_handlers[] = {
 		.chain = armv7m_trace_command_handlers,
 	},
 	{
-		.name = "km1m4xx",
+		.name = "km1m0xx",
 		.mode = COMMAND_ANY,
-		.help = "km1m4xx command group",
+		.help = "km1m0xx command group",
 		.usage = "",
-		.chain = km1m4xx_subcommand_handlers,
+		.chain = km1m0xx_subcommand_handlers,
 	},
 	{
 		.chain = rtt_target_command_handlers,
@@ -2250,8 +2264,8 @@ static const struct command_registration km1m4xx_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct target_type km1m4xx_target = {
-	.name = "km1m4xx",
+struct target_type km1m0xx_target = {
+	.name = "km1m0xx",
 
 	.poll = cortex_m_poll,
 	.arch_state = armv7m_arch_state,
@@ -2262,8 +2276,8 @@ struct target_type km1m4xx_target = {
 	.resume = cortex_m_resume,
 	.step = cortex_m_step,
 
-	.assert_reset = km1m4xx_m_assert_reset,
-	.deassert_reset = cortex_m_deassert_reset,
+	.assert_reset = cortex_m_assert_reset,
+	.deassert_reset = km1m0xx_deassert_reset,
 	.soft_reset_halt = cortex_m_soft_reset_halt,
 
 	.get_gdb_arch = arm_get_gdb_arch,
@@ -2284,7 +2298,7 @@ struct target_type km1m4xx_target = {
 	.remove_watchpoint = cortex_m_remove_watchpoint,
 	.hit_watchpoint = cortex_m_hit_watchpoint,
 
-	.commands = km1m4xx_command_handlers,
+	.commands = km1m0xx_command_handlers,
 	.target_create = cortex_m_target_create,
 	.target_jim_configure = adiv5_jim_configure,
 	.init_target = cortex_m_init_target,

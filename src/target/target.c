@@ -103,8 +103,9 @@ extern struct target_type riscv_target;
 extern struct target_type mem_ap_target;
 extern struct target_type esirisc_target;
 extern struct target_type arcv2_target;
-extern struct target_type km1m7xx_target;
+extern struct target_type km1m0xx_target;
 extern struct target_type km1m4xx_target;
+extern struct target_type km1m7xx_target;
 extern struct target_type numicro_dap_target;
 
 static struct target_type *target_types[] = {
@@ -145,8 +146,9 @@ static struct target_type *target_types[] = {
 	&arcv2_target,
 	&aarch64_target,
 	&mips_mips64_target,
-	&km1m7xx_target,
+	&km1m0xx_target,
 	&km1m4xx_target,
+	&km1m7xx_target,
 	&numicro_dap_target,
 	NULL,
 };
