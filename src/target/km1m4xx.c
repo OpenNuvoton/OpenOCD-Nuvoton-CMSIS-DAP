@@ -1513,7 +1513,50 @@ static int cortex_m_step(struct target *target, int current,
 	return ERROR_OK;
 }
 
-static int km1m4xx_m_assert_reset(struct target *target)
+static int km1m4xx_unlock_dap(struct target *target)
+{
+	int ret = 0;
+	uint32_t optreg0 = 0;
+	uint32_t cpuid = 0;
+	uint32_t optreg0_key = 0x672c0000;
+
+	/* Disable WDT */
+	ret = target_read_u32(target, 0xf0102010, &optreg0);
+	if (ret != ERROR_OK)
+		return ret;
+
+	ret = target_write_u32(target, 0xf0102010, ((optreg0 & 0xffff) | optreg0_key | 0x00000004));
+	if (ret != ERROR_OK)
+		return ret;
+
+	/* When CPUID is 0x00000000, it may be security locked. */
+	ret = target_read_u32(target, CPUID, &cpuid);
+	if (ret != ERROR_OK)
+		cpuid = 0;
+
+	LOG_TARGET_INFO(target, "CPUID = 0x%08x", cpuid);
+	if (cpuid == 0 && km1m4xx_key_set == 1) {
+		/* Unlock DAP */
+		target_write_u32(target, 0xf0102000, km1m4xx_key_data[0]);
+		target_write_u32(target, 0xf0102004, km1m4xx_key_data[1]);
+		target_write_u32(target, 0xf0102008, km1m4xx_key_data[2]);
+		target_write_u32(target, 0xf010200c, km1m4xx_key_data[3]);
+
+		/* Still if the CPUID is 0x00000000, the security can not be unlocked */
+		ret = target_read_u32(target, CPUID, &cpuid);
+		if (ret != ERROR_OK)
+			return ret;
+
+		LOG_TARGET_INFO(target, "CPUID = 0x%08x", cpuid);
+		if (cpuid == 0x00000000) {
+			LOG_TARGET_ERROR(target, "Cannot unlock security");
+			return ERROR_FAIL;
+		}
+	}
+	return ERROR_OK;
+}
+
+static int km1m4xx_assert_reset(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 	struct armv7m_common *armv7m = &cortex_m->armv7m;
@@ -1575,48 +1618,13 @@ static int km1m4xx_m_assert_reset(struct target *target)
 	}
 
 	/* Start of original procedure for km1m4xx series */
-	uint32_t	optreg0	= 0;
-	uint32_t	cpuid	= 0;
-	int			ret		= 0;
-	uint32_t	optreg0_key	= 0x672c0000;
-
-	/* Disable WDT */
-	ret = target_read_u32(target, 0xf0102010, &optreg0);
-	if (ret != ERROR_OK)
-		return ret;
-
-	ret = target_write_u32(target, 0xf0102010, ((optreg0 & 0xffff) | optreg0_key | 0x00000004));
-	if (ret != ERROR_OK)
-		return ret;
-
-	/* When CPUID is 0x00000000, it may be security locked. */
-	ret = target_read_u32(target, 0xe000ed00, &cpuid);
-	if (ret != ERROR_OK)
-		return ret;
-
-	LOG_INFO("CPUID = 0x%08x\n", cpuid);
-	if (cpuid == 0 && km1m4xx_key_set == 1) {
-		/* Unlock DAP */
-		target_write_u32(target, 0xf0102000, km1m4xx_key_data[0]);
-		target_write_u32(target, 0xf0102004, km1m4xx_key_data[1]);
-		target_write_u32(target, 0xf0102008, km1m4xx_key_data[2]);
-		target_write_u32(target, 0xf010200c, km1m4xx_key_data[3]);
-
-		/* Still if the CPUID is 0x00000000, the security can not be unlocked */
-		ret = target_read_u32(target, 0xe000ed00, &cpuid);
-		if (ret != ERROR_OK)
-			return ret;
-
-		LOG_INFO("CPUID = 0x%08x\n", cpuid);
-		if (cpuid == 0x00000000) {
-			LOG_ERROR("Cannot unlock security");
-			return ERROR_FAIL;
-		}
-	}
+ 	int retval = km1m4xx_unlock_dap(target);
+	if (retval != ERROR_OK)
+		return retval;
 	/* End of original procedure for km1m4xx series */
 
 	/* Enable debug requests */
-	int retval = cortex_m_read_dhcsr_atomic_sticky(target);
+	retval = cortex_m_read_dhcsr_atomic_sticky(target);
 
 	/* Store important errors instead of failing and proceed to reset assert */
 
@@ -1814,6 +1822,59 @@ static int cortex_m_init_target(struct command_context *cmd_ctx,
 	armv7m_build_reg_cache(target);
 	arm_semihosting_init(target);
 	return ERROR_OK;
+}
+
+static int cortex_m_find_mem_ap(struct adiv5_dap *swjdp,
+		struct adiv5_ap **debug_ap)
+{
+	if (dap_find_get_ap(swjdp, AP_TYPE_AHB3_AP, debug_ap) == ERROR_OK)
+		return ERROR_OK;
+
+	return dap_find_get_ap(swjdp, AP_TYPE_AHB5_AP, debug_ap);
+}
+
+int km1m4xx_examine(struct target *target)
+{
+ 	/* Start of original procedure for km1m4xx series */
+	int retval;
+	struct cortex_m_common *cortex_m = target_to_cm(target);
+	struct adiv5_dap *swjdp = cortex_m->armv7m.arm.dap;
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+
+	if (!armv7m->debug_ap) {
+		if (cortex_m->apsel == DP_APSEL_INVALID) {
+			/* Search for the MEM-AP */
+			retval = cortex_m_find_mem_ap(swjdp, &armv7m->debug_ap);
+			if (retval != ERROR_OK) {
+				LOG_TARGET_ERROR(target, "Could not find MEM-AP to control the core");
+				return retval;
+			}
+		} else {
+			armv7m->debug_ap = dap_get_ap(swjdp, cortex_m->apsel);
+			if (!armv7m->debug_ap) {
+				LOG_ERROR("Cannot get AP");
+				return ERROR_FAIL;
+			}
+		}
+	}
+
+	armv7m->debug_ap->memaccess_tck = 8;
+
+	retval = mem_ap_init(armv7m->debug_ap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (!target_was_examined(target)) {
+		target_set_examined(target);
+
+	 	retval = km1m4xx_unlock_dap(target);
+		target->examined = false;
+		if (retval != ERROR_OK)
+			return retval;
+	}
+ 	/* End of original procedure for km1m4xx series */
+
+	return cortex_m_examine(target);
 }
 
 static int cortex_m_dcc_read(struct target *target, uint8_t *value, uint8_t *ctrl)
@@ -2262,7 +2323,7 @@ struct target_type km1m4xx_target = {
 	.resume = cortex_m_resume,
 	.step = cortex_m_step,
 
-	.assert_reset = km1m4xx_m_assert_reset,
+	.assert_reset = km1m4xx_assert_reset,
 	.deassert_reset = cortex_m_deassert_reset,
 	.soft_reset_halt = cortex_m_soft_reset_halt,
 
@@ -2288,7 +2349,7 @@ struct target_type km1m4xx_target = {
 	.target_create = cortex_m_target_create,
 	.target_jim_configure = adiv5_jim_configure,
 	.init_target = cortex_m_init_target,
-	.examine = cortex_m_examine,
+	.examine = km1m4xx_examine,
 	.deinit_target = cortex_m_deinit_target,
 
 	.profiling = cortex_m_profiling,
