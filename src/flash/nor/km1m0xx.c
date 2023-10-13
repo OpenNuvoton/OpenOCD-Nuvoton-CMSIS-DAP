@@ -52,30 +52,28 @@ enum clock_type_code {
 	KM1M0XX_CLOCK_TYPE_KM1M0DX
 };
 
-#define KM1M0DX_BANKS(aprom_size, d_flash_size, aprom_option_size, d_flashoption_size) \
+#define KM1M0DX_BANKS(aprom_size, d_flash_size) \
 	.flash_type = KM1M0XX_FLASH_TYPE_KM1M0DX, \
-	.n_banks = 4, \
+	.n_banks = 2, \
 	{ {0x00000000,	(aprom_size)}, \
-	  {0x00100000,	(d_flash_size)}, \
-	  {0x00200800,	(aprom_option_size)}, \
-	  {0x00300800,	(d_flashoption_size)} }
+	  {0x00100000,	(d_flash_size)} }
 
 static const struct km1mxxx_cpu_type km1m0xx_parts[] = {
 	/*PART NO*/			/*PART ID*/		/*Banks*/
 	/* KM1M0D Series */
-	{"KM1M0DF02N",		0x08001004,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF02N",		0x08001001,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF03N",		0x08001000,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF03N",		0x08001003,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF04N",		0x08001005,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF04N",		0x08001002,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF13N",		0x08002000,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
-	{"KM1M0DF13N",		0x08002003,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
+	{"KM1M0DF02N",	0x08001004,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF02N",	0x08001001,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF03N",	0x08001000,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF03N",	0x08001003,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF04N",	0x08001005,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF04N",	0x08001002,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF13N",	0x08002000,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
+	{"KM1M0DF13N",	0x08002003,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
 
 #if 1	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
 	/* For devices with no Part ID written. */
 	/* default */
-	{"KM1M0default",	0xffffffff,		KM1M0DX_BANKS(512 * 1024, 48 * 1024, 6 * 1024, 2 * 1024)},
+	{"KM1M0default",	0xffffffff,		KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
 #endif	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
 };
 
@@ -199,16 +197,12 @@ static int km1m0xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 	uint64_t	timeout			= 0;
 	uint32_t	sector_index	= 0;
 	uint32_t	address			= 0;
-	uint32_t	flash_type		= 0;
-	uint32_t	cache_ctrl_flag	= 0;
 	enum clock_type_code		clock_type = 0;
 	struct km1mxxx_flash_bank	*flash_bank_info;
 
 	/* Flash Memory type  */
 	flash_bank_info = bank->driver_priv;
-	if (flash_bank_info) {
-		flash_type = flash_bank_info->cpu->flash_type;
-	} else {
+	if (!flash_bank_info) {
 		LOG_ERROR("NuMicro flash driver: Unknown flash type\n");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
@@ -300,7 +294,6 @@ static int km1m0xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	uint32_t				status			= 0;
 	enum clock_type_code	clock_type		= 0;
 
-	uint32_t	flash_type		= KM1M0XX_FLASH_TYPE_KM1M0DX;
 	struct km1mxxx_flash_bank	*flash_bank_info;
 	static const uint8_t write_code[] = {
 		0xf8, 0xb5, 0x00, 0x22, 0x00, 0x23, 0x00, 0x24,
@@ -380,9 +373,7 @@ static int km1m0xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 
 	/* Flash Memory type  */
 	flash_bank_info = bank->driver_priv;
-	if (flash_bank_info) {
-		flash_type = flash_bank_info->cpu->flash_type;
-	} else {
+	if (!flash_bank_info) {
 		LOG_ERROR("NuMicro flash driver: Unknown flash type\n");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
@@ -519,7 +510,6 @@ static int km1m0xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 static int km1m0xx_probe(struct flash_bank *bank)
 {
 	int			cnt;
-	uint32_t	part_id = 0x00000000;
 	uint32_t	flash_size = 0;
 	uint32_t	offset = 0;
 	uint32_t	flash_sector_size = FLASH_SECTOR_SIZE_2K;
