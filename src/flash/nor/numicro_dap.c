@@ -34,14 +34,20 @@
 /* Definition NUMICRO_DAP Flash Memory Address */
 #define NUMICRO_DAP_APROM_BASE		0x00000000
 #define NUMICRO_DAP_LDROM_BASE		0x00100000
-#define NUMICRO_NEW_FLASH_OFFSET 0x0F000000UL
+#define NUMICRO_NEW_FLASH_OFFSET	0x0F000000UL
+
+/* Definition NUVOICE_N574_DAP Flash Memory Address */
+#define NUVOICE_N574_DAP_APROM_BASE		0x00000000
+#define NUVOICE_N574_DAP_LDROM_BASE		0x00200000
+#define NUVOICE_N574F128_DAP_LDROM_BASE 0x00100000
 
 /* Definition NUMICRO_DAP Flash Memory Type */
-#define FLASH_TYPE_M2L31	0x00000000
-#define FLASH_TYPE_M4		0x00000001
-#define FLASH_TYPE_M0_AHB5	0x00000002
-#define FLASH_TYPE_M0_AHB4	0x00000003
-#define FLASH_TYPE_M23		0x00000004
+#define FLASH_TYPE_M2L31				0x00000000
+#define FLASH_TYPE_M4					0x00000001
+#define FLASH_TYPE_M0_AHB5				0x00000002
+#define FLASH_TYPE_M0_AHB4				0x00000003
+#define FLASH_TYPE_M23					0x00000004
+#define FLASH_TYPE_M0_AHB5_NUVIOCE_N574 0x00000005
 
 /* Nuvoton NuMicro register locations */
 #define NUMICRO_SYS_WRPROT		0x50000100UL
@@ -81,6 +87,16 @@
 	.n_banks = 2, \
 	{{NUMICRO_DAP_APROM_BASE, aprom_size}, \
 	{NUMICRO_DAP_LDROM_BASE + NUMICRO_NEW_FLASH_OFFSET, ldrom_size}}
+
+#define NUVOICE_N574_DAP_BANKS(aprom_size, ldrom_size) \
+	.n_banks = 2, \
+	{{NUVOICE_N574_DAP_APROM_BASE, aprom_size}, \
+	{NUVOICE_N574_DAP_LDROM_BASE, ldrom_size}}
+
+#define NUVOICE_N574F128_DAP_BANKS(aprom_size, ldrom_size) \
+	.n_banks = 2, \
+	{{NUVOICE_N574_DAP_APROM_BASE, aprom_size}, \
+	{NUVOICE_N574F128_DAP_LDROM_BASE, ldrom_size}}
 
 static int m_addressminusoffset = 0x10000000;
 const struct numicro_dap_cpu_type *m_cpu;
@@ -645,6 +661,11 @@ static const struct numicro_dap_cpu_type numicro_dap_parts[] = {
 	{"Nano103SD3AE", 0x00110301, FLASH_TYPE_M0_AHB5, NUMICRO_DAP_BANKS(64 * 1024, 4 * 1024), SECTOR_SIZE_512},
 	{"Nano103LD3AE", 0x00110304, FLASH_TYPE_M0_AHB5, NUMICRO_DAP_BANKS(64 * 1024, 4 * 1024), SECTOR_SIZE_512},
 	{"Nano103ZD3AE", 0x00110307, FLASH_TYPE_M0_AHB5, NUMICRO_DAP_BANKS(64 * 1024, 4 * 1024), SECTOR_SIZE_512},
+	{"N574F128", 0x0B010D83, FLASH_TYPE_M0_AHB5, NUVOICE_N574F128_DAP_BANKS(128 * 1024, 6 * 1024), SECTOR_SIZE_512},
+	{"N574F256", 0x0B010B93, FLASH_TYPE_M0_AHB5, NUVOICE_N574_DAP_BANKS(256 * 1024, 6 * 1024), SECTOR_SIZE_512},
+	{"N574F512", 0x0B010BB3, FLASH_TYPE_M0_AHB5, NUVOICE_N574_DAP_BANKS(512 * 1024, 6 * 1024), SECTOR_SIZE_512},
+	{"N574F1K0", 0x0B010BC3, FLASH_TYPE_M0_AHB5, NUVOICE_N574_DAP_BANKS(1024 * 1024, 6 * 1024), SECTOR_SIZE_512},
+	{"N574F1K5", 0x0B010BD3, FLASH_TYPE_M0_AHB5, NUVOICE_N574_DAP_BANKS(1536 * 1024, 6 * 1024), SECTOR_SIZE_512}
 };
 
 /* Definition for static functions */
@@ -758,6 +779,27 @@ static const uint32_t numicro_m4_flash_algorithm_code[] = {
 0x0401f004, 0xd1f82c00, 0x68234c0c, 0x0440f003, 0x4c0ab114, 0xe00a6023, 0x68a34c08, 0x429c6814,
 0xe004d000, 0x1d121d00, 0x29001f09, 0xbf00d1d7, 0xe7bfbf00, 0x40000100, 0x40000200, 0x4000c000,
 0x0055aa03, 0x00000000
+};
+
+static const uint32_t nuvoice_n574_m0_ahb5_flash_algorithm_code[] = {
+0xE00ABE00, 0x4603b530, 0x2164460c, 0x4d842059, 0x20166028, 0x20886028, 0x46286028, 0x07c06800,
+0x28000fc0, 0x2001d101, 0x487ebd30, 0x25046800, 0x4d7c4328, 0x46286028, 0x25046840, 0x4d794328,
+0xbf006068, 0x1e494608, 0xd1fb2800, 0x68004876, 0x43282521, 0x60284d74, 0x69c04628, 0x43282501,
+0x61e84d71, 0x68004628, 0x0fc007c0, 0xd1012800, 0xe7d92001, 0x6800486c, 0x43282540, 0x60284d6a,
+0xe7d12000, 0xbf004601, 0x69004867, 0x0fc007c0, 0xd1f92800, 0x68004864, 0x43902221, 0x60104a62,
+0x69c04610, 0x00400840, 0x200061d0, 0x46014770, 0x485dbf00, 0x07c06900, 0x28000fc0, 0x485ad1f9,
+0x22406800, 0x4a584310, 0x20226010, 0x088860d0, 0x60500080, 0x61102001, 0x8f60f3bf, 0x4852bf00,
+0x07c06900, 0x28000fc0, 0x484fd1f9, 0x22406800, 0x28004010, 0x484cd006, 0x43106800, 0x60104a4a,
+0x47702001, 0xe7fc2000, 0x4603b570, 0x2500460c, 0x4629e009, 0x00891c6d, 0xf7ff5858, 0x1e06ffc8,
+0x4630d001, 0x42a5bd70, 0x2000d3f3, 0xb510e7fa, 0x1cc84603, 0x00890881, 0x483bbf00, 0x07c06900,
+0x28000fc0, 0x4838d1f9, 0x24406800, 0x4c364320, 0xe0226020, 0x4c342021, 0x089860e0, 0x60600080,
+0x60a06810, 0x61202001, 0x8f60f3bf, 0x482ebf00, 0x07c06900, 0x28000fc0, 0x482bd1f9, 0x24406800,
+0x28004020, 0x4828d006, 0x43206800, 0x60204c26, 0xbd102001, 0x1d121d1b, 0x29001f09, 0x2000d1da,
+0xb510e7f7, 0x08991ccb, 0xbf000089, 0x691b4b1e, 0x0fdb07db, 0xd1f92b00, 0x681b4b1b, 0x43232440,
+0x60234c19, 0x2300e027, 0x60e34c17, 0x009b0883, 0x23006063, 0x230160a3, 0xf3bf6123, 0xbf008f60,
+0x691b4b11, 0x0fdb07db, 0xd1f92b00, 0x681b4b0e, 0x40232440, 0xd0052b00, 0x681b4b0b, 0x4c0a4323,
+0xbd106023, 0x689b4b08, 0x42a36814, 0xe7f8d000, 0x1d121d00, 0x29001f09, 0xbf00d1d5, 0x0000e7f1,
+0x50000100, 0x50000200, 0x5000c000, 0x00000000
 };
 
 /**
@@ -1006,7 +1048,30 @@ static int numicro_dap_write(struct flash_bank *bank, const uint8_t *buffer, uin
 			}
 			algorithm_init_entry_offset = 0x5;
 			algorithm_programpage_entry_offset = 0x11d;
-		} else {
+		}
+		else if(m_cpu->flash_type == FLASH_TYPE_M0_AHB5_NUVIOCE_N574){
+			/* Get working area for code */
+			result = target_alloc_working_area(target,
+												sizeof(nuvoice_n574_m0_ahb5_flash_algorithm_code),
+												&algorithm);
+			if (result != ERROR_OK) {
+				LOG_DEBUG("target_alloc_working_area() = %d\n", result);
+				return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
+			}
+
+			/* Transfer write program to RAM */
+			result = target_write_buffer(target,
+										algorithm->address,
+										sizeof(nuvoice_n574_m0_ahb5_flash_algorithm_code),
+										(const uint8_t *)nuvoice_n574_m0_ahb5_flash_algorithm_code);
+			if (result != ERROR_OK) {
+				LOG_DEBUG("target_write_buffer() = %d\n", result);
+				target_free_working_area(target, algorithm);
+				return result;
+			}
+			algorithm_init_entry_offset = 0x5;
+			algorithm_programpage_entry_offset = 0x12f;			
+		}else {
 			/* Get working area for code */
 			result = target_alloc_working_area(target,
 												sizeof(numicro_m0_ahb5_flash_algorithm_code),
