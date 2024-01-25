@@ -509,7 +509,7 @@ static int swd_queue_ap_bankselect(struct adiv5_ap *ap, unsigned reg)
 		if (dap->select != DP_SELECT_INVALID)
 			sel |= dap->select & 0xf;
 		dap->select = sel;
-		LOG_DEBUG("AP BANKSEL: %" PRIx64, sel);
+//		LOG_DEBUG("AP BANKSEL: %" PRIx64, sel);
 
 		retval = swd_queue_dp_write(dap, DP_SELECT, (uint32_t)sel);
 

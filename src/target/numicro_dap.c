@@ -1899,6 +1899,61 @@ static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 	return ERROR_OK;
 }
 
+COMMAND_HANDLER(handle_cortex_m_reset_config_command)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	struct cortex_m_common *cortex_m = target_to_cm(target);
+	int retval;
+	char *reset_config;
+
+	if (CMD_ARGC > 0) {
+		if (strcmp(*CMD_ARGV, "sysresetreq") == 0)
+			cortex_m->soft_reset_config = CORTEX_M_RESET_SYSRESETREQ;
+
+		else if (strcmp(*CMD_ARGV, "vectreset") == 0) {
+			if (target_was_examined(target)
+					&& !cortex_m->vectreset_supported)
+				LOG_TARGET_WARNING(target, "VECTRESET is not supported on your Cortex-M core!");
+			else
+				cortex_m->soft_reset_config = CORTEX_M_RESET_VECTRESET;
+
+		} else
+			return ERROR_COMMAND_SYNTAX_ERROR;
+	}
+
+	switch (cortex_m->soft_reset_config) {
+		case CORTEX_M_RESET_SYSRESETREQ:
+			reset_config = "sysresetreq";
+			break;
+
+		case CORTEX_M_RESET_VECTRESET:
+			reset_config = "vectreset";
+			break;
+
+		default:
+			reset_config = "unknown";
+			break;
+	}
+
+	command_print(CMD, "cortex_m reset_config %s", reset_config);
+
+	return ERROR_OK;
+}
+
+static const struct command_registration cortex_m_exec_command_handlers[] = {
+	{
+		.name = "reset_config",
+		.handler = handle_cortex_m_reset_config_command,
+		.mode = COMMAND_ANY,
+		.help = "configure software reset handling",
+		.usage = "['sysresetreq'|'vectreset']",
+	},
+	{
+		.chain = smp_command_handlers,
+	},
+	COMMAND_REGISTRATION_DONE
+};
+
 static const struct command_registration cortex_m_command_handlers[] = {
 	{
 		.chain = armv7m_command_handlers,
@@ -1911,6 +1966,13 @@ static const struct command_registration cortex_m_command_handlers[] = {
 		.chain = arm_tpiu_deprecated_command_handlers,
 	},
 	/* END_DEPRECATED_TPIU */
+	{
+		.name = "cortex_m",
+		.mode = COMMAND_EXEC,
+		.help = "Cortex-M command group",
+		.usage = "",
+		.chain = cortex_m_exec_command_handlers,
+	},
 	{
 		.chain = rtt_target_command_handlers,
 	},
