@@ -1556,6 +1556,65 @@ static int km1m0xx_unlock_dap(struct target *target)
 	return ERROR_OK;
 }
 
+static int cortex_m_find_mem_ap(struct adiv5_dap *swjdp,
+		struct adiv5_ap **debug_ap)
+{
+	if (dap_find_get_ap(swjdp, AP_TYPE_AHB3_AP, debug_ap) == ERROR_OK)
+		return ERROR_OK;
+
+	return dap_find_get_ap(swjdp, AP_TYPE_AHB5_AP, debug_ap);
+}
+
+int km1m0xx_examine(struct target *target)
+{
+ 	/* Start of original procedure for km1m0xx series */
+	int retval;
+	struct cortex_m_common *cortex_m = target_to_cm(target);
+	struct adiv5_dap *swjdp = cortex_m->armv7m.arm.dap;
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+
+	retval = dap_dp_init_or_reconnect(swjdp);
+	if (retval != ERROR_OK) {
+		swjdp->do_reconnect = true;
+		return retval;
+	}
+
+	if (!armv7m->debug_ap) {
+		if (cortex_m->apsel == DP_APSEL_INVALID) {
+			/* Search for the MEM-AP */
+			retval = cortex_m_find_mem_ap(swjdp, &armv7m->debug_ap);
+			if (retval != ERROR_OK) {
+				LOG_TARGET_ERROR(target, "Could not find MEM-AP to control the core");
+				return retval;
+			}
+		} else {
+			armv7m->debug_ap = dap_get_ap(swjdp, cortex_m->apsel);
+			if (!armv7m->debug_ap) {
+				LOG_ERROR("Cannot get AP");
+				return ERROR_FAIL;
+			}
+		}
+	}
+
+	armv7m->debug_ap->memaccess_tck = 8;
+
+	retval = mem_ap_init(armv7m->debug_ap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (!target_was_examined(target)) {
+		target_set_examined(target);
+
+	 	retval = km1m0xx_unlock_dap(target);
+		target->examined = false;
+		if (retval != ERROR_OK)
+			return retval;
+	}
+ 	/* End of original procedure for km1m0xx series */
+
+	return cortex_m_examine(target);
+}
+
 static int km1m0xx_assert_reset(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
@@ -1823,65 +1882,6 @@ static int cortex_m_init_target(struct command_context *cmd_ctx,
 	armv7m_build_reg_cache(target);
 	arm_semihosting_init(target);
 	return ERROR_OK;
-}
-
-static int cortex_m_find_mem_ap(struct adiv5_dap *swjdp,
-		struct adiv5_ap **debug_ap)
-{
-	if (dap_find_get_ap(swjdp, AP_TYPE_AHB3_AP, debug_ap) == ERROR_OK)
-		return ERROR_OK;
-
-	return dap_find_get_ap(swjdp, AP_TYPE_AHB5_AP, debug_ap);
-}
-
-int km1m0xx_examine(struct target *target)
-{
- 	/* Start of original procedure for km1m0xx series */
-	int retval;
-	struct cortex_m_common *cortex_m = target_to_cm(target);
-	struct adiv5_dap *swjdp = cortex_m->armv7m.arm.dap;
-	struct armv7m_common *armv7m = target_to_armv7m(target);
-
-	retval = dap_dp_init_or_reconnect(swjdp);
-	if (retval != ERROR_OK) {
-		swjdp->do_reconnect = true;
-		return retval;
-	}
-
-	if (!armv7m->debug_ap) {
-		if (cortex_m->apsel == DP_APSEL_INVALID) {
-			/* Search for the MEM-AP */
-			retval = cortex_m_find_mem_ap(swjdp, &armv7m->debug_ap);
-			if (retval != ERROR_OK) {
-				LOG_TARGET_ERROR(target, "Could not find MEM-AP to control the core");
-				return retval;
-			}
-		} else {
-			armv7m->debug_ap = dap_get_ap(swjdp, cortex_m->apsel);
-			if (!armv7m->debug_ap) {
-				LOG_ERROR("Cannot get AP");
-				return ERROR_FAIL;
-			}
-		}
-	}
-
-	armv7m->debug_ap->memaccess_tck = 8;
-
-	retval = mem_ap_init(armv7m->debug_ap);
-	if (retval != ERROR_OK)
-		return retval;
-
-	if (!target_was_examined(target)) {
-		target_set_examined(target);
-
-	 	retval = km1m0xx_unlock_dap(target);
-		target->examined = false;
-		if (retval != ERROR_OK)
-			return retval;
-	}
- 	/* End of original procedure for km1m0xx series */
-
-	return cortex_m_examine(target);
 }
 
 static int cortex_m_dcc_read(struct target *target, uint8_t *value, uint8_t *ctrl)
