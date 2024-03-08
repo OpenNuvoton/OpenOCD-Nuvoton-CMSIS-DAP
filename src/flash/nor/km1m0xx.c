@@ -58,6 +58,12 @@ enum clock_type_code {
 	{ {0x00000000,	(aprom_size)}, \
 	  {0x00100000,	(d_flash_size)} }
 
+#define KM1M0GX_BANKS(aprom_size, option_size) \
+	.flash_type = KM1M0XX_FLASH_TYPE_KM1M0DX, \
+	.n_banks = 2, \
+	{ {0x00000000,	(aprom_size)}, \
+	  {0x00200800,	(option_size)} }
+
 static const struct km1mxxx_cpu_type km1m0xx_parts[] = {
 	/*PART NO*/			/*PART ID*/		/*Banks*/
 	/* KM1M0D Series */
@@ -70,11 +76,31 @@ static const struct km1mxxx_cpu_type km1m0xx_parts[] = {
 	{"KM1M0DF13N",	0x08002000,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
 	{"KM1M0DF13N",	0x08002003,	KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
 
-#if 1	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+	/* KM1M0G Series */
+	{"KM1M0GF01K",	0x08003000,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF02K",	0x08003001,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF03K",	0x08003002,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF04K",	0x08003003,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF01Z",	0x08003010,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF02Z",	0x08003011,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF03Z",	0x08003012,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF04Z",	0x08003013,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF11Z",	0x08004010,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF12Z",	0x08004011,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF13Z",	0x08004012,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF14Z",	0x08004013,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF01Y",	0x08005010,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF02Y",	0x08005011,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF03Y",	0x08005012,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF04Y",	0x08005013,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF11Y",	0x08006010,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF12Y",	0x08006011,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF13Y",	0x08006012,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+	{"KM1M0GF14Y",	0x08006013,	KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
+
 	/* For devices with no Part ID written. */
 	/* default */
-	{"KM1M0default",	0xffffffff,		KM1M0DX_BANKS(512 * 1024, 48 * 1024)},
-#endif	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+	{"KM1M0default",	0xffffffff,		KM1M0GX_BANKS(256 * 1024, 2 * 1024)},
 };
 
 /* Private variable  */
@@ -93,17 +119,15 @@ static int km1m0xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 
-#if 1	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
 	/* For devices with no Part ID written. */
 	uint32_t product_code = (part_id >> 20) & 0xff;
 	if (product_code != 0x80) {
-		LOG_ERROR("NuMicro flash driver: Invalid part ID. (0x%08x)\n", part_id);
+		LOG_ERROR("NuMicro flash driver: Invalid part ID. (0x%08x)", part_id);
 		part_id = 0xffffffff;
 	}
-#endif	/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
 
-	LOG_INFO("NuMicro flash driver: Device ID: 0x%08" PRIx32 "", part_id);
 	/* search part numbers */
+	LOG_INFO("NuMicro flash driver: Device ID: 0x%08" PRIx32 "", part_id);
 	for (size_t i = 0; i < ARRAY_SIZE(km1m0xx_parts); i++) {
 		if (part_id == km1m0xx_parts[i].partid) {
 			*cpu = &km1m0xx_parts[i];
@@ -119,6 +143,10 @@ static int km1m0xx_get_flash_size(struct flash_bank *bank, const struct km1mxxx_
 {
 	for (size_t i = 0; i < cpu->n_banks; i++) {
 		if (bank->base == cpu->bank[i].base) {
+			if (cpu->bank[i].size == 0) {
+				LOG_ERROR("NuMicro flash driver: No memory for bank (address = " TARGET_ADDR_FMT ")", bank->base);
+				break;
+			}
 			*flash_size = cpu->bank[i].size;
 			LOG_INFO("NuMicro flash driver: bank base = " TARGET_ADDR_FMT ", size = 0x%08"
 					PRIx32, bank->base, *flash_size);
