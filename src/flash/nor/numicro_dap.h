@@ -35,7 +35,7 @@
 #define	SECTOR_SIZE_8K		0x00002000
 
 /* flash MAX banks */
-#define NUMICRO_DAP_MAX_FLASH_BANKS		2
+#define NUMICRO_DAP_MAX_FLASH_BANKS		3
 
 /* flash bank structs */
 struct numicro_dap_flash_bank_type {
@@ -45,8 +45,8 @@ struct numicro_dap_flash_bank_type {
 
 /* part structs */
 struct numicro_dap_cpu_type {
-	char *partname;
-	uint32_t partid;
+	char *part_name;
+	uint32_t part_id;
 	unsigned int flash_type;
 	unsigned int n_banks;
 	struct numicro_dap_flash_bank_type bank[NUMICRO_DAP_MAX_FLASH_BANKS];
@@ -54,8 +54,9 @@ struct numicro_dap_cpu_type {
 };
 
 struct numicro_dap_flash_bank {
-	int		probed;
+	bool probed;
 	const struct numicro_dap_cpu_type *cpu;
+	bool secure_debug;
 };
 
 #endif /* OPENOCD_FLASH_NOR_NUMICRO_DAP_H */
