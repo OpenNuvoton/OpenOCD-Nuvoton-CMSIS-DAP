@@ -1903,7 +1903,6 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
 	struct cortex_m_common *cortex_m = target_to_cm(target);
-	int retval;
 	char *reset_config;
 
 	if (CMD_ARGC > 0) {
