@@ -88,6 +88,7 @@
 
 #define AHBCLK_ISP_EN		BIT(2)
 #define ISPCTL_ISPEN		BIT(0)
+#define ISPCTL_EWEN			BIT(1)
 #define ISPCTL_SPUEN		BIT(2)
 #define ISPCTL_APUEN		BIT(3)
 #define ISPCTL_CFGUEN		BIT(4)
@@ -1324,7 +1325,13 @@ static int numicro_init_isp(struct target *target, struct flash_bank *bank, uint
 		if (retval != ERROR_OK)
 			return retval;
 
-		reg_stat |= ISPCTL_ISPFF | ISPCTL_SPUEN | ISPCTL_LDUEN | ISPCTL_APUEN | ISPCTL_CFGUEN | ISPCTL_ISPEN;
+		if (flash_bank_info->cpu->flash_type == FLASH_TYPE_NUVIOCE_N572) {
+			reg_stat |= ISPCTL_ISPFF | ISPCTL_SPUEN | ISPCTL_LDUEN | ISPCTL_APUEN | ISPCTL_CFGUEN | ISPCTL_EWEN | ISPCTL_ISPEN;
+		}
+		else {
+			reg_stat |= ISPCTL_ISPFF | ISPCTL_SPUEN | ISPCTL_LDUEN | ISPCTL_APUEN | ISPCTL_CFGUEN | ISPCTL_ISPEN;
+		}
+
 		retval = target_write_u32(target, fmc_isp_base + NUMICRO_FLASH_ISPCTL, reg_stat);
 		if (retval != ERROR_OK)
 			return retval;
