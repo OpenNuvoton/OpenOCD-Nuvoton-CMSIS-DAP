@@ -30,6 +30,7 @@
 
 /* Definition for Flash Memory */
 #define	SECTOR_SIZE_512		0x00000200
+#define	SECTOR_SIZE_1K		0x00000400
 #define	SECTOR_SIZE_2K		0x00000800
 #define	SECTOR_SIZE_4K		0x00001000
 #define	SECTOR_SIZE_8K		0x00002000
