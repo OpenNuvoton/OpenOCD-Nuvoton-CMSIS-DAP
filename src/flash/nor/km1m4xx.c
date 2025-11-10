@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *   Copyright (C) 2022 by Nuvoton Technology Corporation Japan            *
- *   Naotoshi Izumi <izumi.naotoshi@nuvoton.com>                           *
+ *   Yoshikazu Yamaguchi <yamaguchi.yoshikazu@nuvoton.com>                 *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -93,7 +93,14 @@ static const struct km1mxxx_cpu_type km1m4xx_parts[] = {
 	{"KM1M4BF55KXE",	0x08401259,		KM1M4XX_BANKS(264 * 1024, 32 * 1024)},
 	{"KM1M4BF55GXY",	0x08401358,		KM1M4XX_BANKS(136 * 1024,  8 * 1024)},
 	{"KM1M4BF55GXG",	0x08401359,		KM1M4XX_BANKS(136 * 1024,  8 * 1024)},
+
+	{"KM1M4BF64GXW",	0x08402231,		KM1M4XX_BANKS(136 * 1024,  8 * 1024)},
+	{"KM1M4BF65GXW",	0x08402233,		KM1M4XX_BANKS(136 * 1024,  8 * 1024)},
+	{"KM1M4BF66GXW",	0x08402234,		KM1M4XX_BANKS(136 * 1024,  8 * 1024)},
+	{"KM1M4BF67GXW",	0x08402235,		KM1M4XX_BANKS(136 * 1024,  8 * 1024)},
 };
+
+static uint32_t km1m4xx_as_part_id;
 
 /* Definition for static functions */
 static int km1m4xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_type **cpu);
@@ -104,13 +111,14 @@ static int km1m4xx_get_flash_size(struct flash_bank *bank, const struct km1mxxx_
  * @brief	"flash bank" Command
  * @date	October, 2018
  * @note	[Usage]	flash bank $_FLASHNAME km1m4xx
- *					<Address> <size> <ChipWidth> <BusWidth> <Target> <Type>
+ *					<Address> <size> <ChipWidth> <BusWidth> <Target> <Type> [<PID>]
  *						<Address>	: Flash memory base address
  *						<Size>		: Flash memory size
  *						<ChipWidth>	: Chip width in byte (Not use)
  *						<BusWidth>	: Bus width in byte (Not use)
  *						<Target>	: Target device (***.cpu)
  *						<Type>		: Write control type
+ *						<PID>		: Alternative Part ID
  * @param
  * @return	int			ERROR_OK or the non-zero
  **/
@@ -123,8 +131,14 @@ FLASH_BANK_COMMAND_HANDLER(km1m4xx_flash_bank_command)
 		LOG_ERROR("NuMicro flash driver: Out of memory");
 		return ERROR_FAIL;
 	}
-
 	memset(flash_bank_info, 0, sizeof(struct km1mxxx_flash_bank));
+
+	/* Specifying an alternative part ID */
+	if (CMD_ARGC >= 8) {
+		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[7], km1m4xx_as_part_id);
+	} else {
+		km1m4xx_as_part_id = 0;
+	}
 
 	bank->driver_priv = flash_bank_info;
 	flash_bank_info->probed	= 0;
@@ -279,7 +293,7 @@ static int km1m4xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	}
 
 	/* Get working area for data */
-	buffer_size	= 4 * 1024;
+	buffer_size	= 16 * 1024;
 	result		= ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	while (result != ERROR_OK) {
 		result = target_alloc_working_area_try(target, buffer_size, &source);
@@ -426,8 +440,14 @@ static int km1m4xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_
 		LOG_ERROR("NuMicro flash driver: Failed to Get PartID\n");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
+	LOG_INFO("NuMicro flash driver: Device ID: 0x%08" PRIx32 "", part_id);
 
-	LOG_INFO("Device ID: 0x%08" PRIx32 "", part_id);
+	/* If an alternative Part ID is specified, replace it. */
+	if (km1m4xx_as_part_id != 0) {
+		LOG_INFO("NuMicro flash driver: Connect to flash as part ID = 0x%08" PRIx32 "", km1m4xx_as_part_id);
+		part_id = km1m4xx_as_part_id;
+	}
+
 	/* search part numbers */
 	for (size_t i = 0; i < ARRAY_SIZE(km1m4xx_parts); i++) {
 		if (part_id == km1m4xx_parts[i].partid) {

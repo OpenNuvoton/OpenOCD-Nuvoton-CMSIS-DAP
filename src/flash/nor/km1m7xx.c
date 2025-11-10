@@ -81,7 +81,7 @@
 #define KM1M7XX_DATA0_BASE			0x00C04000
 #define KM1M7XX_DATA1_BASE			0x00E04000
 
-/* Definition KM1M4X Flash Memory Type */
+/* Definition KM1M7X Flash Memory Type */
 #define KM1M7XX_FLASH_TYPE_KM1M7AB	0x00000000
 #define KM1M7XX_FLASH_TYPE_KM1M7C	0x00000001
 
@@ -127,6 +127,7 @@ static const struct km1mxxx_cpu_type km1m7xx_parts[] = {
 
 /* Definition for static variable  */
 static uint32_t backup_ccr;
+static uint32_t km1m7xx_as_part_id;
 
 /* Definition for static functions */
 static int km1m7xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_type **cpu);
@@ -246,6 +247,13 @@ FLASH_BANK_COMMAND_HANDLER(km1m7xx_flash_bank_command)
 	}
 
 	memset(flash_bank_info, 0, sizeof(struct km1mxxx_flash_bank));
+
+	/* Specifying an alternative part ID */
+	if (CMD_ARGC >= 8) {
+		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[7], km1m7xx_as_part_id);
+	} else {
+		km1m7xx_as_part_id = 0;
+	}
 
 	bank->driver_priv = flash_bank_info;
 	flash_bank_info->probed	= 0;
@@ -453,7 +461,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	}
 
 	/* Get working area for data */
-	buffer_size	= 4 * 1024;
+	buffer_size	= 16 * 1024;
 	result = ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	while (result != ERROR_OK) {
 		result = target_alloc_working_area_try(target, buffer_size, &source);
@@ -634,13 +642,19 @@ static int km1m7xx_get_cpu_type(struct target *target, const struct km1mxxx_cpu_
 		LOG_ERROR("NuMicro flash driver: Failed to Get PartID\n");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
+	LOG_INFO("NuMicro flash driver: Device ID: 0x%08" PRIx32 "", part_id);
 
-	LOG_INFO("Device ID: 0x%08" PRIx32 "", part_id);
+	/* If an alternative Part ID is specified, replace it. */
+	if (km1m7xx_as_part_id != 0) {
+		LOG_INFO("NuMicro flash driver: Connect to flash as part ID = 0x%08" PRIx32 "", km1m7xx_as_part_id);
+		part_id = km1m7xx_as_part_id;
+	}
+
 	/* search part numbers */
 	for (size_t i = 0; i < ARRAY_SIZE(km1m7xx_parts); i++) {
 		if (part_id == km1m7xx_parts[i].partid) {
 			*cpu = &km1m7xx_parts[i];
-			LOG_INFO("Device Name: %s", (*cpu)->partname);
+			LOG_INFO("NuMicro flash driver: Device Name: %s", (*cpu)->partname);
 			return ERROR_OK;
 		}
 	}
@@ -705,6 +719,11 @@ static int km1m7xx_probe(struct flash_bank *bank)
 		 * by leaving flash_bank_info->probed=0.
 		 **/
 		return ERROR_OK;
+	}
+
+	/* If an alternative Part ID is specified, replace it. */
+	if (km1m7xx_as_part_id != 0) {
+		part_id = km1m7xx_as_part_id;
 	}
 
 	if (part_id == 0x00000001 || part_id == 0x00000003) {
