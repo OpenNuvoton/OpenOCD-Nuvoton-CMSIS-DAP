@@ -308,7 +308,7 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 	for (sector_index = first; sector_index <= last; sector_index++) {
 		/* Get sector address */
 		address = bank->base + bank->sectors[sector_index].offset;
-		LOG_INFO("Erase at 0x%08x (Index:%d) ", address, sector_index);
+		LOG_INFO("NuMicro flash driver: Erase at 0x%08x (Index:%d) ", address, sector_index);
 
 		/* Set parameter */
 		target_write_u32(bank->target, PEADR,
@@ -334,13 +334,13 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 			/* Check error */
 			if ((read_fmon & FMON_ERROR) != 0) {
-				LOG_DEBUG("%s Error : FMON = %d\n", __func__, read_fmon);
+				LOG_DEBUG("NuMicro flash driver: %s Error : FMON = 0x%08x\n", __func__, read_fmon);
 				return ERROR_FAIL;
 			}
 
 			/* Check timeout */
 			if ((timeval_ms() - timeout) > TIMEOUT_ERASE) {
-				LOG_DEBUG("%s timeout : FMON = %d\n", __func__, read_fmon);
+				LOG_DEBUG("NuMicro flash driver: %s timeout : FMON = 0x%08x\n", __func__, read_fmon);
 				/* Flash Cache disable */
 				if (cache_ctrl_flag) {
 					enable_icache(bank);
@@ -357,7 +357,7 @@ static int km1m7xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 		/* Check error */
 		if ((read_fmon & FMON_ERROR) != 0) {
-			LOG_DEBUG("%s Error : FMON = %d\n", __func__, read_fmon);
+			LOG_DEBUG("NuMicro flash driver: %s Error : FMON = 0x%08x\n", __func__, read_fmon);
 			/* Flash Cache disable */
 			if (cache_ctrl_flag) {
 				enable_icache(bank);
@@ -396,6 +396,9 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	uint8_t					*write_data		= 0;
 	uint32_t				status			= 0;
 	uint32_t				cache_ctrl_flag	= 0;
+
+	uint32_t				align_error		= 0;
+	uint8_t					*buffer_temp	= NULL;
 
 	uint32_t	flash_type		= KM1M7XX_FLASH_TYPE_KM1M7AB;
 	struct km1mxxx_flash_bank	*flash_bank_info;
@@ -445,7 +448,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 										sizeof(write_code),
 										&algorithm);
 	if (result != ERROR_OK) {
-		LOG_DEBUG("target_alloc_working_area() = %d\n", result);
+		LOG_DEBUG("NuMicro flash driver: target_alloc_working_area() = %d\n", result);
 		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	}
 
@@ -455,7 +458,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 								sizeof(write_code),
 								write_code);
 	if (result != ERROR_OK) {
-		LOG_DEBUG("target_write_buffer() = %d\n", result);
+		LOG_DEBUG("NuMicro flash driver: target_write_buffer() = %d\n", result);
 		target_free_working_area(target, algorithm);
 		return result;
 	}
@@ -470,7 +473,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 
 		buffer_size /= 2;
 		if (buffer_size < 256) {
-			LOG_DEBUG("target_alloc_working_area_try() = %d\n", result);
+			LOG_DEBUG("NuMicro flash driver: target_alloc_working_area_try() = %d\n", result);
 			target_free_working_area(target, algorithm);
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 		}
@@ -481,7 +484,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	if (flash_bank_info) {
 		flash_type = flash_bank_info->cpu->flash_type;
 	} else {
-		LOG_ERROR("NuMicro flash driver: Unknown flash type\n");
+		LOG_ERROR("NuMicro flash driver: NuMicro flash driver: Unknown flash type\n");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 
@@ -537,17 +540,34 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	mem_params32[1] = source->address;
 	mem_params32[3] = program_unit;
 
-	/* Program in units */
-	remain_size		= count;
-	write_address	= bank->base + offset;
-	write_data		= (uint8_t *)buffer;
-	write_size		= buffer_size;
+	/**
+	 *	Program in units
+	 *		Address is restricted to alignment with the minimum write unit.
+	 *		(Add 0xff to the beginning of the write data)
+	 **/
+	align_error = (bank->base + offset) % program_unit;
+	if (align_error) {
+		remain_size		= count + align_error;
+		write_address	= bank->base + offset - align_error;
+
+		buffer_temp = malloc(remain_size);
+		memset(buffer_temp, 0xff, remain_size);
+		memcpy((buffer_temp + align_error), buffer, count);
+		write_data		= buffer_temp;
+		write_size		= buffer_size;
+	} else {
+		remain_size		= count;
+		write_address	= bank->base + offset;
+		write_data		= (uint8_t *)buffer;
+		write_size		= buffer_size;
+		buffer_temp		= NULL;
+	}
 
 	while (remain_size != 0) {
 		if (remain_size < buffer_size)
 			write_size = remain_size;
 
-		LOG_INFO("Program at 0x%08x to 0x%08x",
+		LOG_INFO("NuMicro flash driver: Program at 0x%08x to 0x%08x",
 				write_address, (write_address + write_size - 1));
 
 		/**
@@ -571,7 +591,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 									16,
 									mem_params8);
 		if (result != ERROR_OK) {
-			LOG_DEBUG("target_write_buffer() = %d\n", result);
+			LOG_DEBUG("NuMicro flash driver: target_write_buffer() = %d\n", result);
 			break;
 		}
 
@@ -581,7 +601,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 									write_size,
 									write_data);
 		if (result != ERROR_OK) {
-			LOG_DEBUG("target_write_buffer() = %d\n", result);
+			LOG_DEBUG("NuMicro flash driver: target_write_buffer() = %d\n", result);
 			break;
 		}
 
@@ -596,7 +616,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 										1000,
 										&armv7m_info);
 		if (result != ERROR_OK) {
-			LOG_DEBUG("target_run_algorithm() = %d\n", result);
+			LOG_DEBUG("NuMicro flash driver: target_run_algorithm() = %d\n", result);
 			result = ERROR_FLASH_OPERATION_FAILED;
 			break;
 		}
@@ -606,7 +626,7 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 								algorithm->address + sizeof(write_code) - 4,
 								&status);
 		if (result != ERROR_OK) {
-			LOG_DEBUG("target_read_u32() = %d\n", result);
+			LOG_DEBUG("NuMicro flash driver: target_read_u32() = %d\n", result);
 			break;
 		}
 
@@ -623,6 +643,9 @@ static int km1m7xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	}
 
 	/* Free allocated area */
+	if (buffer_temp != NULL) {
+		free(buffer_temp);
+	}
 	target_free_working_area(target, algorithm);
 	target_free_working_area(target, source);
 	destroy_reg_param(&reg_params[0]);
@@ -667,7 +690,7 @@ static int km1m7xx_get_flash_size(struct flash_bank *bank, const struct km1mxxx_
 	for (size_t i = 0; i < cpu->n_banks; i++) {
 		if (bank->base == cpu->bank[i].base) {
 			*flash_size = cpu->bank[i].size;
-			LOG_INFO("bank base = " TARGET_ADDR_FMT ", size = 0x%08"
+			LOG_INFO("NuMicro flash driver: bank base = " TARGET_ADDR_FMT ", size = 0x%08"
 					PRIx32, bank->base, *flash_size);
 			return ERROR_OK;
 		}
@@ -693,7 +716,7 @@ static int km1m7xx_get_cpu_type_km1m7ab(struct target *target, const struct km1m
 		/* Size comparison with I-Flash(bank0) */
 		if (iflash_size == km1m7xx_parts_km1m7ab[i].bank[0].size) {
 			*cpu = &km1m7xx_parts_km1m7ab[i];
-			LOG_INFO("Device Name: %s", (*cpu)->partname);
+			LOG_INFO("NuMicro flash driver: Device Name: %s", (*cpu)->partname);
 			return ERROR_OK;
 		}
 	}
@@ -770,19 +793,19 @@ static int km1m7xx_probe(struct flash_bank *bank)
 
 static int km1m7xx_protect(struct flash_bank *bank, int set, unsigned int first, unsigned int last)
 {
-	LOG_INFO("protect function is unsupported\n");
+	LOG_INFO("NuMicro flash driver: protect function is unsupported\n");
 	return ERROR_FLASH_OPER_UNSUPPORTED;
 }
 
 static int km1m7xx_erase_check(struct flash_bank *bank)
 {
-	LOG_INFO("erase_check function is unsupported\n");
+	LOG_INFO("NuMicro flash driver: erase_check function is unsupported\n");
 	return ERROR_FLASH_OPER_UNSUPPORTED;
 }
 
 static int km1m7xx_protect_check(struct flash_bank *bank)
 {
-	LOG_INFO("protect_check function is unsupported\n");
+	LOG_INFO("NuMicro flash driver: protect_check function is unsupported\n");
 	return ERROR_OK;
 }
 

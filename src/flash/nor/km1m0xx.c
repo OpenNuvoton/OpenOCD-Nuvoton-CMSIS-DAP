@@ -283,14 +283,14 @@ static int km1m0xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 			/* Check error */
 			if ((read_fmon & FMON_ERROR) != 0) {
-				LOG_DEBUG("NuMicro flash driver: %s Error : FMON = %d\n", __func__, read_fmon);
+				LOG_DEBUG("NuMicro flash driver: %s Error : FMON = 0x%08x\n", __func__, read_fmon);
 				restore_clock(bank, clock_type);
 				return ERROR_FAIL;
 			}
 
 			/* Check timeout */
 			if ((timeval_ms() - timeout) > TIMEOUT_ERASE) {
-				LOG_DEBUG("NuMicro flash driver: %s timeout : FMON = %d\n", __func__, read_fmon);
+				LOG_DEBUG("NuMicro flash driver: %s timeout : FMON = 0x%08x\n", __func__, read_fmon);
 				restore_clock(bank, clock_type);
 				return ERROR_FAIL;
 			}
@@ -303,7 +303,7 @@ static int km1m0xx_erase(struct flash_bank *bank, unsigned int first, unsigned i
 
 		/* Check error */
 		if ((read_fmon & FMON_ERROR) != 0) {
-			LOG_DEBUG("NuMicro flash driver: %s Error : FMON = %d\n", __func__, read_fmon);
+			LOG_DEBUG("NuMicro flash driver: %s Error : FMON = 0x%08x\n", __func__, read_fmon);
 			restore_clock(bank, clock_type);
 			return ERROR_FAIL;
 		}
@@ -335,6 +335,9 @@ static int km1m0xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	uint8_t					*write_data		= 0;
 	uint32_t				status			= 0;
 	enum clock_type_code	clock_type		= 0;
+
+	uint32_t				align_error		= 0;
+	uint8_t					*buffer_temp	= NULL;
 
 	struct km1mxxx_flash_bank	*flash_bank_info;
 	static const uint8_t write_code[] = {
@@ -458,11 +461,28 @@ static int km1m0xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	mem_params32[1] = source->address;
 	mem_params32[3] = program_unit;
 
-	/* Program in units */
-	remain_size		= count;
-	write_address	= bank->base + offset;
-	write_data		= (uint8_t *)buffer;
-	write_size		= buffer_size;
+	/**
+	 *	Program in units
+	 *		Address is restricted to alignment with the minimum write unit.
+	 *		(Add 0xff to the beginning of the write data)
+	 **/
+	align_error = (bank->base + offset) % program_unit;
+	if (align_error) {
+		remain_size		= count + align_error;
+		write_address	= bank->base + offset - align_error;
+
+		buffer_temp = malloc(remain_size);
+		memset(buffer_temp, 0xff, remain_size);
+		memcpy((buffer_temp + align_error), buffer, count);
+		write_data		= buffer_temp;
+		write_size		= buffer_size;
+	} else {
+		remain_size		= count;
+		write_address	= bank->base + offset;
+		write_data		= (uint8_t *)buffer;
+		write_size		= buffer_size;
+		buffer_temp		= NULL;
+	}
 
 	while (remain_size != 0) {
 		if (remain_size < buffer_size)
@@ -541,6 +561,9 @@ static int km1m0xx_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	restore_clock(bank, clock_type);
 
 	/* Free allocated area */
+	if (buffer_temp != NULL) {
+		free(buffer_temp);
+	}
 	target_free_working_area(target, algorithm);
 	target_free_working_area(target, source);
 	destroy_reg_param(&reg_params[0]);
