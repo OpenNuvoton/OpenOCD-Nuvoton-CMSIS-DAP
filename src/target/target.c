@@ -31,6 +31,7 @@
 #endif
 
 #include <helper/align.h>
+#include <helper/configuration.h>
 #include <helper/time_support.h>
 #include <jtag/jtag.h>
 #include <flash/nor/core.h>
@@ -3512,8 +3513,18 @@ COMMAND_HANDLER(handle_md_command)
 
 	struct target *target = get_current_target(CMD_CTX);
 	int retval = fn(target, address, size, count, buffer);
-	if (retval == ERROR_OK)
+	if (retval == ERROR_OK) {
 		target_handle_md_output(CMD, target, address, size, count, buffer);
+
+		if (strcmp(CMD_NAME, "mdw") == 0 && nuvoice_mdw_log_enabled() &&
+				LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
+			for (unsigned i = 0; i < count; i++) {
+				uint32_t value = target_buffer_get_u32(target, buffer + i * size);
+				LOG_DEBUG("mdw " TARGET_ADDR_FMT ": 0x%8.8" PRIx32,
+						address + i * size, value);
+			}
+		}
+	}
 
 	free(buffer);
 
@@ -5965,14 +5976,14 @@ static const struct command_registration target_instance_command_handlers[] = {
 		.handler = handle_mw_command,
 		.mode = COMMAND_EXEC,
 		.help = "Write 64-bit word(s) to target memory",
-		.usage = "address data [count]",
+		.usage = "['phys'] address [count]",
 	},
 	{
 		.name = "mww",
 		.handler = handle_mw_command,
 		.mode = COMMAND_EXEC,
 		.help = "Write 32-bit word(s) to target memory",
-		.usage = "address data [count]",
+		.usage = "['phys'] address [count]",
 	},
 	{
 		.name = "mwh",

@@ -700,6 +700,7 @@ bash$ openocd --help
              | -d<n>    set debug level to <level>
 --log_output | -l       redirect log output to file <name>
 --command    | -c       run <command>
+[nuvoicesettings.cfg] optional NuVoice settings file
 @end verbatim
 
 If you don't give any @option{-f} or @option{-c} options,
@@ -710,6 +711,13 @@ configuration files, use @option{-f} options. For example:
 @example
 openocd -f config1.cfg -f config2.cfg -f config3.cfg
 @end example
+
+NuVoice builds also accept an optional trailing file named
+@file{nuvoicesettings.cfg}. This file is not a Tcl configuration script;
+it uses @code{key = value} syntax. Setting
+@code{MDW_DEBUG_INFO_ENABLE = Y} enables per-word @command{mdw} values in the
+level 3 debug log. Any other value, or an absent
+@code{MDW_DEBUG_INFO_ENABLE}, leaves that logging disabled.
 
 Configuration files and scripts are searched for in
 @enumerate
@@ -5217,6 +5225,9 @@ Otherwise, or if the optional @var{phys} flag is specified,
 If @var{count} is specified, displays that many units.
 (If you want to process the data instead of displaying it,
 see the @code{read_memory} primitives.)
+If the optional startup file @file{nuvoicesettings.cfg} contains
+@code{MDW_DEBUG_INFO_ENABLE = Y}, each @command{mdw} word is also written to
+the level 3 debug log. This does not change the normal command output.
 @end deffn
 
 @deffn {Command} {$target_name mwd} [phys] addr doubleword [count]
@@ -8880,6 +8891,9 @@ Otherwise, or if the optional @var{phys} flag is specified,
 If @var{count} is specified, displays that many units.
 (If you want to process the data instead of displaying it,
 see the @code{read_memory} primitives.)
+If the optional startup file @file{nuvoicesettings.cfg} contains
+@code{MDW_DEBUG_INFO_ENABLE = Y}, each @command{mdw} word is also written to
+the level 3 debug log. This does not change the normal command output.
 @end deffn
 
 @deffn {Command} {mwd} [phys] addr doubleword [count]
