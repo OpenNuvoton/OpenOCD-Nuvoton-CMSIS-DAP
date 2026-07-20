@@ -18,7 +18,9 @@
 
 #include <getopt.h>
 
+#include <ctype.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #if IS_DARWIN
@@ -35,6 +37,86 @@
 #endif
 
 static int help_flag, version_flag;
+static bool nuvoice_mdw_log;
+
+bool nuvoice_mdw_log_enabled(void)
+{
+	return nuvoice_mdw_log;
+}
+
+static char *trim_whitespace(char *text)
+{
+	while (isspace((unsigned char)*text))
+		text++;
+
+	char *end = text + strlen(text);
+	while (end > text && isspace((unsigned char)end[-1]))
+		*--end = '\0';
+
+	return text;
+}
+
+static bool is_nuvoice_settings_file(const char *path)
+{
+	const char *filename = strrchr(path, '/');
+	const char *backslash = strrchr(path, '\\');
+	if (!filename || (backslash && backslash > filename))
+		filename = backslash;
+	if (filename)
+		filename++;
+	else
+		filename = path;
+
+	return strcmp(filename, "nuvoicesettings.cfg") == 0;
+}
+
+static int parse_nuvoice_settings_file(const char *path)
+{
+	FILE *file = fopen(path, "r");
+	if (!file) {
+		LOG_ERROR("failed to open NuVoice settings file '%s'", path);
+		return ERROR_FAIL;
+	}
+
+	char line[256];
+	bool mdw_debug_info_enable_found = false;
+	nuvoice_mdw_log = false;
+	while (fgets(line, sizeof(line), file)) {
+		char *key = trim_whitespace(line);
+		if (*key == '\0' || *key == '#' || *key == ';')
+			continue;
+
+		char *separator = strchr(key, '=');
+		if (!separator)
+			continue;
+		*separator++ = '\0';
+		key = trim_whitespace(key);
+		char *value = trim_whitespace(separator);
+
+		if (strcmp(key, "MDW_DEBUG_INFO_ENABLE") != 0)
+			continue;
+
+		mdw_debug_info_enable_found = true;
+		if (strcmp(value, "Y") == 0)
+			nuvoice_mdw_log = true;
+		else if (strcmp(value, "N") != 0)
+			LOG_WARNING("NuVoice MDW_DEBUG_INFO_ENABLE must be Y or N, got '%s'", value);
+	}
+
+	if (ferror(file)) {
+		LOG_ERROR("failed while reading NuVoice settings file '%s'", path);
+		fclose(file);
+		return ERROR_FAIL;
+	}
+	fclose(file);
+
+	if (!mdw_debug_info_enable_found)
+		LOG_WARNING("NuVoice MDW_DEBUG_INFO_ENABLE is not set; mdw debug logging is disabled");
+	else
+		LOG_INFO("NuVoice mdw debug logging: %s", nuvoice_mdw_log ? "enabled" : "disabled");
+
+	return ERROR_OK;
+}
 
 static const struct option long_options[] = {
 	{"help",		no_argument,			&help_flag,		1},
@@ -316,6 +398,14 @@ int parse_cmdline_args(struct command_context *cmd_ctx, int argc, char *argv[])
 		}
 	}
 
+	if (optind < argc && argc - optind == 1 &&
+			is_nuvoice_settings_file(argv[optind])) {
+		int retval = parse_nuvoice_settings_file(argv[optind]);
+		if (retval != ERROR_OK)
+			return retval;
+		optind++;
+	}
+
 	if (optind < argc) {
 		/* Catch extra arguments on the command line. */
 		LOG_OUTPUT("Unexpected command line argument: %s\n", argv[optind]);
@@ -332,6 +422,7 @@ int parse_cmdline_args(struct command_context *cmd_ctx, int argc, char *argv[])
 		LOG_OUTPUT("             | -d<n>\tset debug level to <level>\n");
 		LOG_OUTPUT("--log_output | -l\tredirect log output to file <name>\n");
 		LOG_OUTPUT("--command    | -c\trun <command>\n");
+		LOG_OUTPUT("[nuvoicesettings.cfg]\toptional NuVoice settings file\n");
 		exit(-1);
 	}
 

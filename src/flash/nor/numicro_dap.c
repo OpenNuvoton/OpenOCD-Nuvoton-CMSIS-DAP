@@ -95,6 +95,7 @@
 #define NUMICRO_SCS_DHCSR       0xE000EDF0UL
 #define ARM_SRAM_START_ADDRESS			0x20000000UL
 #define NUMICRO_NS_OFFSET				0x10000000UL
+#define NUMICRO_SYS_UCID0_ADDR			0x50000150UL
 
 #define AHBCLK_ISP_EN		BIT(2)
 #define ISPCTL_ISPEN		BIT(0)
@@ -968,6 +969,13 @@ static const struct numicro_dap_cpu_type numicro_dap_parts[] = {
 	{"N574F512", 0x0B010BB3, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x80000, 0x1800, 0), SECTOR_SIZE_512},
 	{"N574F1K0", 0x0B010BC3, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x100000, 0x1800, 0), SECTOR_SIZE_512},
 	{"N574F1K5", 0x0B010BD3, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x180000, 0x1800, 0), SECTOR_SIZE_512},
+	{"N574C128", 0x0B070D83, FLASH_TYPE_NUVIOCE_N574, NUMICRO_DAP_BANKS(0x20000, 0x1800, 0), SECTOR_SIZE_512},
+	{"N574C256", 0x0B070B93, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x40000, 0x1800, 0), SECTOR_SIZE_512},
+	{"N574C512", 0x0B070BB3, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x80000, 0x1800, 0), SECTOR_SIZE_512},
+	{"N574C1K0", 0x0B070BC3, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x100000, 0x1800, 0), SECTOR_SIZE_512},
+	{"N574C1K5", 0x0B070BD3, FLASH_TYPE_NUVIOCE_N574, NUVOICE_N574_DAP_BANKS(0x180000, 0x1800, 0), SECTOR_SIZE_512},
+	{"N574F129", 0x0B010D83, FLASH_TYPE_NUVIOCE_N574, NUMICRO_DAP_BANKS(0x20000, 0x1800, 0), SECTOR_SIZE_512, 0x00040000},
+	{"N574E129", 0x0B100D83, FLASH_TYPE_NUVIOCE_N574, NUMICRO_DAP_BANKS(0x20000, 0x1800, 0), SECTOR_SIZE_512},
 	{"N572F065", 0x0B650000, FLASH_TYPE_NUVIOCE_N572, NUMICRO_DAP_BANKS(0x10000, 0x0, 0), SECTOR_SIZE_512},
 	{"N572F072", 0x0B720000, FLASH_TYPE_NUVIOCE_N572, NUMICRO_DAP_BANKS(0x12000, 0x0, 0), SECTOR_SIZE_512},
 	{"NSC128L42", 0x0B010EA4, FLASH_TYPE_NUVIOCE_NSC128, NUMICRO_DAP_BANKS(0x50000, 0x1800, 0), SECTOR_SIZE_512},
@@ -2159,8 +2167,35 @@ static int numicro_dap_write(struct flash_bank *bank, const uint8_t *buffer, uin
 
 static int numicro_dap_get_cpu_type(struct target *target, const struct numicro_dap_cpu_type **cpu, uint32_t part_id)
 {
-	/* search part numbers */
+	uint32_t ucid0 = 0;
+	bool ucid0_read = false;
+
+	// First pass: prefer entries that require a specific UCID0 match (disambiguates parts sharing the same PDID)
 	for (size_t i = 0; i < ARRAY_SIZE(numicro_dap_parts); i++) {
+		if (numicro_dap_parts[i].ucid0 == 0)
+			continue;
+		if (part_id != numicro_dap_parts[i].part_id)
+			continue;
+
+		if (!ucid0_read) {
+			if (target_read_u32(target, NUMICRO_SYS_UCID0_ADDR, &ucid0) != ERROR_OK) {
+				LOG_WARNING("NuMicro flash driver: Failed to read UCID0; skipping UCID-specific match");
+				break;
+			}
+			ucid0_read = true;
+		}
+
+		if (ucid0 == numicro_dap_parts[i].ucid0) {
+			*cpu = &numicro_dap_parts[i];
+			LOG_INFO("Device Name: %s (UCID0=0x%08" PRIx32 ")", (*cpu)->part_name, ucid0);
+			return ERROR_OK;
+		}
+	}
+
+	// Second pass: generic match on PDID (entries without a UCID0 constraint)
+	for (size_t i = 0; i < ARRAY_SIZE(numicro_dap_parts); i++) {
+		if (numicro_dap_parts[i].ucid0 != 0)
+			continue;
 		if (part_id == numicro_dap_parts[i].part_id) {
 			*cpu = &numicro_dap_parts[i];
 			LOG_INFO("Device Name: %s", (*cpu)->part_name);

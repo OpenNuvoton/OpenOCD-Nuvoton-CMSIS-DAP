@@ -52,6 +52,7 @@ struct numicro_dap_cpu_type {
 	unsigned int n_banks;
 	struct numicro_dap_flash_bank_type bank[NUMICRO_DAP_MAX_FLASH_BANKS];
 	unsigned int page_size;
+	uint32_t ucid0;		// 0 = don't care; otherwise match SYS_UCID0 to disambiguate parts sharing the same PDID
 };
 
 struct numicro_dap_flash_bank {

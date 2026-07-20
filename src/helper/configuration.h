@@ -16,6 +16,8 @@
 int parse_cmdline_args(struct command_context *cmd_ctx,
 		int argc, char *argv[]);
 
+bool nuvoice_mdw_log_enabled(void);
+
 int parse_config_file(struct command_context *cmd_ctx);
 void add_config_command(const char *cfg);
 
