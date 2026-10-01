@@ -16,6 +16,7 @@
 #include <flash/nor/core.h>
 #include <flash/nor/imp.h>
 #include <target/image.h>
+#include <target/target_type.h>
 
 /**
  * @file
@@ -25,6 +26,699 @@
  */
 
 static struct flash_bank *flash_banks;
+
+/*
+ * Flash software breakpoints modify persistent target storage.  Keep an
+ * independent host-side record so a failed front-end removal can still be
+ * retried during target teardown.  This is deliberately separate from the
+ * target breakpoint list, whose entries may be freed even when target-side
+ * removal reports an error.
+ */
+struct flash_breakpoint_record {
+	struct target *target;
+	target_addr_t address;
+	uint32_t length;
+	uint8_t *breakpoint_instruction;
+	uint8_t *original_instruction;
+	struct flash_breakpoint_record *next;
+};
+
+struct flash_breakpoint_location {
+	struct flash_bank *bank;
+	unsigned int sector_index;
+	uint32_t sector_offset;
+	uint32_t sector_size;
+	uint32_t instruction_offset;
+};
+
+struct flash_breakpoint_work_area_snapshot {
+	target_addr_t address;
+	uint32_t size;
+	uint8_t *data;
+	uint8_t *verify;
+};
+
+/* Accessed only from OpenOCD's single-threaded command/target event loop. */
+static struct flash_breakpoint_record *flash_breakpoint_records;
+
+static void flash_breakpoint_release_work_area_snapshot(
+		struct flash_breakpoint_work_area_snapshot *snapshot)
+{
+	free(snapshot->data);
+	free(snapshot->verify);
+	memset(snapshot, 0, sizeof(*snapshot));
+}
+
+static int flash_breakpoint_get_work_area(struct target *target,
+		target_addr_t *address, uint32_t *size)
+{
+	*size = target->working_area_size;
+	if (!*size)
+		return ERROR_OK;
+
+	/* Once initialized, this is the same effective address used by the
+	 * working-area allocator. */
+	if (target->working_areas) {
+		*address = target->working_area;
+		return ERROR_OK;
+	}
+
+	int mmu_enabled;
+	int retval = target->type->mmu(target, &mmu_enabled);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] unable to determine the working-area address (error=%d)",
+			retval);
+		return retval;
+	}
+
+	if (!mmu_enabled && target->working_area_phys_spec) {
+		*address = target->working_area_phys;
+		return ERROR_OK;
+	}
+
+	if (mmu_enabled && target->working_area_virt_spec) {
+		*address = target->working_area_virt;
+		return ERROR_OK;
+	}
+
+	/* A driver which requires a working area will fail its own allocation.
+	 * Drivers which do not use target RAM need no snapshot. */
+	*size = 0;
+	LOG_TARGET_DEBUG(target, "[FLASH-BP] no configured working area to preserve");
+	return ERROR_OK;
+}
+
+static int flash_breakpoint_save_work_area(struct target *target,
+		struct flash_breakpoint_work_area_snapshot *snapshot,
+		const char *phase)
+{
+	memset(snapshot, 0, sizeof(*snapshot));
+
+	int retval = flash_breakpoint_get_work_area(target,
+		&snapshot->address, &snapshot->size);
+	if (retval != ERROR_OK || !snapshot->size)
+		return retval;
+
+	snapshot->data = malloc(snapshot->size);
+	snapshot->verify = malloc(snapshot->size);
+	if (!snapshot->data || !snapshot->verify) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s cannot allocate host memory to preserve "
+			"working area at " TARGET_ADDR_FMT " size=%" PRIu32,
+			phase, snapshot->address, snapshot->size);
+		flash_breakpoint_release_work_area_snapshot(snapshot);
+		return ERROR_FAIL;
+	}
+
+	retval = target_read_buffer(target, snapshot->address, snapshot->size,
+		snapshot->data);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s cannot preserve working area at "
+			TARGET_ADDR_FMT " size=%" PRIu32 " (error=%d); flash was not modified",
+			phase, snapshot->address, snapshot->size, retval);
+		flash_breakpoint_release_work_area_snapshot(snapshot);
+		return retval;
+	}
+
+	LOG_TARGET_DEBUG(target, "[FLASH-BP] %s saved working area at "
+		TARGET_ADDR_FMT " size=%" PRIu32,
+		phase, snapshot->address, snapshot->size);
+	return ERROR_OK;
+}
+
+static int flash_breakpoint_restore_work_area(struct target *target,
+		struct flash_breakpoint_work_area_snapshot *snapshot,
+		const char *phase)
+{
+	if (!snapshot->size)
+		return ERROR_OK;
+
+	int retval = target_write_buffer(target, snapshot->address,
+		snapshot->size, snapshot->data);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s working-area restore failed at "
+			TARGET_ADDR_FMT " size=%" PRIu32 " (error=%d)",
+			phase, snapshot->address, snapshot->size, retval);
+		return retval;
+	}
+
+	retval = target_read_buffer(target, snapshot->address, snapshot->size,
+		snapshot->verify);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s working-area restore read-back failed at "
+			TARGET_ADDR_FMT " size=%" PRIu32 " (error=%d)",
+			phase, snapshot->address, snapshot->size, retval);
+		return retval;
+	}
+
+	if (memcmp(snapshot->data, snapshot->verify, snapshot->size) != 0) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s working-area restore verify mismatch at "
+			TARGET_ADDR_FMT " size=%" PRIu32,
+			phase, snapshot->address, snapshot->size);
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	LOG_TARGET_DEBUG(target, "[FLASH-BP] %s working-area restore passed at "
+		TARGET_ADDR_FMT " size=%" PRIu32,
+		phase, snapshot->address, snapshot->size);
+	return ERROR_OK;
+}
+
+void flash_breakpoint_set_enabled(struct flash_bank *bank, bool enabled)
+{
+	bank->breakpoints_enabled = enabled;
+}
+
+bool flash_breakpoint_is_enabled(const struct flash_bank *bank)
+{
+	return bank && bank->breakpoints_enabled;
+}
+
+static struct flash_breakpoint_record *flash_breakpoint_find_record(
+		struct target *target, target_addr_t address)
+{
+	for (struct flash_breakpoint_record *record = flash_breakpoint_records;
+			record; record = record->next) {
+		if (record->target == target && record->address == address)
+			return record;
+	}
+
+	return NULL;
+}
+
+static struct flash_breakpoint_record *flash_breakpoint_find_overlap(
+		struct target *target, target_addr_t address, uint32_t length)
+{
+	for (struct flash_breakpoint_record *record = flash_breakpoint_records;
+			record; record = record->next) {
+		if (record->target != target)
+			continue;
+
+		if ((address < record->address && record->address - address < length) ||
+				(address >= record->address && address - record->address < record->length))
+			return record;
+	}
+
+	return NULL;
+}
+
+static void flash_breakpoint_free_record(struct flash_breakpoint_record *record)
+{
+	free(record->breakpoint_instruction);
+	free(record->original_instruction);
+	free(record);
+}
+
+static void flash_breakpoint_remove_record(struct flash_breakpoint_record *record)
+{
+	struct flash_breakpoint_record **record_p = &flash_breakpoint_records;
+
+	while (*record_p && *record_p != record)
+		record_p = &(*record_p)->next;
+
+	if (*record_p) {
+		*record_p = record->next;
+		flash_breakpoint_free_record(record);
+	}
+}
+
+static int flash_breakpoint_locate(struct target *target,
+		target_addr_t address, uint32_t length,
+		struct flash_breakpoint_location *location, bool include_disabled,
+		bool *handled)
+{
+	struct flash_bank *bank = NULL;
+	int retval;
+
+	*handled = false;
+
+	retval = get_flash_bank_by_addr(target, address, false, &bank);
+	if (retval != ERROR_OK)
+		return retval;
+	if (!bank)
+		return ERROR_OK;
+	if (!include_disabled && !flash_breakpoint_is_enabled(bank))
+		return ERROR_OK;
+
+	*handled = true;
+
+	if (!length || !bank->driver || !bank->driver->erase ||
+			!bank->driver->write || !bank->driver->read) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] bank '%s' does not provide the required erase/write/read operations",
+			bank->name);
+		return ERROR_FLASH_OPER_UNSUPPORTED;
+	}
+
+	if (target->state != TARGET_HALTED) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] target must be halted before modifying flash at " TARGET_ADDR_FMT,
+			address);
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
+	if (address < bank->base || address - bank->base >= bank->size ||
+			length > bank->size - (address - bank->base)) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] instruction at " TARGET_ADDR_FMT
+			" (length=%" PRIu32 ") is outside bank '%s'",
+			address, length, bank->name);
+		return ERROR_FLASH_DST_OUT_OF_BANK;
+	}
+
+	uint64_t bank_offset = address - bank->base;
+	for (unsigned int i = 0; i < bank->num_sectors; i++) {
+		uint64_t sector_start = bank->sectors[i].offset;
+		uint64_t sector_end = sector_start + bank->sectors[i].size;
+
+		if (bank_offset < sector_start || bank_offset >= sector_end)
+			continue;
+
+		if ((uint64_t)length > sector_end - bank_offset) {
+			LOG_TARGET_ERROR(target, "[FLASH-BP] instruction at " TARGET_ADDR_FMT
+				" crosses sector %u in bank '%s'",
+				address, i, bank->name);
+			return ERROR_FLASH_DST_BREAKS_ALIGNMENT;
+		}
+
+		location->bank = bank;
+		location->sector_index = i;
+		location->sector_offset = bank->sectors[i].offset;
+		location->sector_size = bank->sectors[i].size;
+		location->instruction_offset = bank_offset - sector_start;
+		return ERROR_OK;
+	}
+
+	LOG_TARGET_ERROR(target, "[FLASH-BP] no sector contains address " TARGET_ADDR_FMT
+		" in bank '%s'", address, bank->name);
+	return ERROR_FLASH_SECTOR_INVALID;
+}
+
+static int flash_breakpoint_program_sector(
+		const struct flash_breakpoint_location *location,
+		const uint8_t *data, uint8_t *verify, const char *phase)
+{
+	struct flash_bank *bank = location->bank;
+	struct target *target = bank->target;
+	int retval;
+
+	LOG_TARGET_DEBUG(target, "[FLASH-BP] %s erase bank='%s' sector=%u address="
+		TARGET_ADDR_FMT " size=%" PRIu32,
+		phase, bank->name, location->sector_index,
+		bank->base + location->sector_offset, location->sector_size);
+
+	/* Some drivers cache this flag and skip an erase when it is one. */
+	bank->sectors[location->sector_index].is_erased = -1;
+	retval = flash_driver_erase(bank, location->sector_index,
+		location->sector_index);
+	if (retval != ERROR_OK) {
+		bank->sectors[location->sector_index].is_erased = -1;
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s erase failed for bank='%s' sector=%u (error=%d)",
+			phase, bank->name, location->sector_index, retval);
+		return retval;
+	}
+
+	LOG_TARGET_DEBUG(target, "[FLASH-BP] %s program bank='%s' sector=%u",
+		phase, bank->name, location->sector_index);
+	retval = flash_driver_write(bank, data, location->sector_offset,
+		location->sector_size);
+	/* A programmed sector must never remain cached as erased. */
+	bank->sectors[location->sector_index].is_erased = -1;
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s program failed for bank='%s' sector=%u (error=%d)",
+			phase, bank->name, location->sector_index, retval);
+		return retval;
+	}
+
+	retval = flash_driver_read(bank, verify, location->sector_offset,
+		location->sector_size);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s read-back failed for bank='%s' sector=%u (error=%d)",
+			phase, bank->name, location->sector_index, retval);
+		return retval;
+	}
+
+	if (memcmp(data, verify, location->sector_size) != 0) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] %s verify mismatch for bank='%s' sector=%u",
+			phase, bank->name, location->sector_index);
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	LOG_TARGET_DEBUG(target, "[FLASH-BP] %s verify passed for bank='%s' sector=%u",
+		phase, bank->name, location->sector_index);
+	return ERROR_OK;
+}
+
+static int flash_breakpoint_rewrite_sector(
+		const struct flash_breakpoint_location *location,
+		const uint8_t *before, const uint8_t *desired, uint8_t *verify,
+		const char *phase)
+{
+	struct target *target = location->bank->target;
+	struct flash_breakpoint_work_area_snapshot work_area;
+	int retval = flash_breakpoint_save_work_area(target, &work_area, phase);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = flash_breakpoint_program_sector(location, desired, verify, phase);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_WARNING(target,
+			"[FLASH-BP] %s failed; attempting full-sector rollback", phase);
+		int rollback_retval = flash_breakpoint_program_sector(location, before,
+			verify, "ROLLBACK");
+		if (rollback_retval == ERROR_OK) {
+			LOG_TARGET_WARNING(target,
+				"[FLASH-BP] rollback completed after %s failure", phase);
+		} else {
+			LOG_TARGET_ERROR(target,
+				"[FLASH-BP] ROLLBACK FAILED after %s failure (error=%d); reflash the original image before running",
+				phase, rollback_retval);
+		}
+	}
+
+	int restore_retval = flash_breakpoint_restore_work_area(target,
+		&work_area, phase);
+	if (restore_retval != ERROR_OK) {
+		/* If the Flash update itself succeeded, do not leave an untracked
+		 * breakpoint (SET) or lose an existing record (CLEAR). Restore the
+		 * pre-transaction Flash image, then make one final RAM restore attempt. */
+		if (retval == ERROR_OK) {
+			LOG_TARGET_ERROR(target, "[FLASH-BP] %s flash update completed but "
+				"working-area restore failed; rolling back flash before returning",
+				phase);
+			int rollback_retval = flash_breakpoint_program_sector(location,
+				before, verify, "ROLLBACK");
+			if (rollback_retval == ERROR_OK) {
+				LOG_TARGET_WARNING(target,
+					"[FLASH-BP] rollback completed after %s working-area restore failure",
+					phase);
+			} else {
+				LOG_TARGET_ERROR(target,
+					"[FLASH-BP] ROLLBACK FAILED after %s working-area restore failure "
+					"(error=%d); reflash the original image before running",
+					phase, rollback_retval);
+			}
+			retval = restore_retval;
+		}
+
+		int retry_retval = flash_breakpoint_restore_work_area(target,
+			&work_area, "RECOVERY");
+		if (retry_retval != ERROR_OK) {
+			LOG_TARGET_ERROR(target, "[FLASH-BP] WORKING AREA RESTORE FAILED "
+				"after %s (error=%d); application RAM may be corrupted",
+				phase, retry_retval);
+		}
+	}
+
+	flash_breakpoint_release_work_area_snapshot(&work_area);
+	return retval;
+}
+
+int flash_breakpoint_set(struct target *target, target_addr_t address,
+		uint32_t length, const uint8_t *breakpoint_instruction,
+		uint8_t *original_instruction, bool *handled)
+{
+	struct flash_breakpoint_location location;
+	struct flash_breakpoint_record *record = NULL;
+	uint8_t *before = NULL;
+	uint8_t *desired = NULL;
+	uint8_t *verify = NULL;
+	int retval;
+
+	if (!handled || !breakpoint_instruction || !original_instruction)
+		return ERROR_FAIL;
+
+	retval = flash_breakpoint_locate(target, address, length, &location,
+		false, handled);
+	if (retval != ERROR_OK || !*handled)
+		return retval;
+
+	struct flash_breakpoint_record *overlap =
+		flash_breakpoint_find_overlap(target, address, length);
+	if (overlap) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] breakpoint at " TARGET_ADDR_FMT
+			" length=%" PRIu32 " overlaps tracked breakpoint at " TARGET_ADDR_FMT
+			" length=%" PRIu32,
+			address, length, overlap->address, overlap->length);
+		return ERROR_FAIL;
+	}
+
+	before = malloc(location.sector_size);
+	desired = malloc(location.sector_size);
+	verify = malloc(location.sector_size);
+	record = calloc(1, sizeof(*record));
+	if (record) {
+		record->breakpoint_instruction = malloc(length);
+		record->original_instruction = malloc(length);
+	}
+	if (!before || !desired || !verify || !record ||
+			!record->breakpoint_instruction || !record->original_instruction) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] out of host memory while preparing breakpoint at "
+			TARGET_ADDR_FMT, address);
+		retval = ERROR_FAIL;
+		goto done;
+	}
+
+	retval = flash_driver_read(location.bank, before, location.sector_offset,
+		location.sector_size);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] unable to read original sector for " TARGET_ADDR_FMT
+			" (error=%d)", address, retval);
+		goto done;
+	}
+
+	uint8_t *instruction = before + location.instruction_offset;
+	if (memcmp(instruction, breakpoint_instruction, length) == 0) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] address " TARGET_ADDR_FMT
+			" already contains the breakpoint opcode; original bytes are unknown. Reflash the image first",
+			address);
+		retval = ERROR_FLASH_OPERATION_FAILED;
+		goto done;
+	}
+
+	memcpy(original_instruction, instruction, length);
+	memcpy(desired, before, location.sector_size);
+	memcpy(desired + location.instruction_offset,
+		breakpoint_instruction, length);
+
+	record->target = target;
+	record->address = address;
+	record->length = length;
+	memcpy(record->breakpoint_instruction, breakpoint_instruction, length);
+	memcpy(record->original_instruction, original_instruction, length);
+
+	LOG_TARGET_INFO(target, "[FLASH-BP] SET begin address=" TARGET_ADDR_FMT
+		" length=%" PRIu32 " bank='%s' sector=%u",
+		address, length, location.bank->name, location.sector_index);
+	retval = flash_breakpoint_rewrite_sector(&location, before, desired,
+		verify, "SET");
+	if (retval != ERROR_OK)
+		goto done;
+
+	record->next = flash_breakpoint_records;
+	flash_breakpoint_records = record;
+	record = NULL;
+	LOG_TARGET_INFO(target, "[FLASH-BP] SET complete address=" TARGET_ADDR_FMT,
+		address);
+
+done:
+	free(before);
+	free(desired);
+	free(verify);
+	if (record)
+		flash_breakpoint_free_record(record);
+	return retval;
+}
+
+int flash_breakpoint_clear(struct target *target, target_addr_t address,
+		uint32_t length, const uint8_t *breakpoint_instruction,
+		const uint8_t *original_instruction, bool *handled)
+{
+	struct flash_breakpoint_location location;
+	struct flash_breakpoint_record *record;
+	const uint8_t *expected_breakpoint = breakpoint_instruction;
+	const uint8_t *expected_original = original_instruction;
+	uint8_t *before = NULL;
+	uint8_t *desired = NULL;
+	uint8_t *verify = NULL;
+	int retval;
+
+	if (!handled || !breakpoint_instruction || !original_instruction)
+		return ERROR_FAIL;
+
+	record = flash_breakpoint_find_record(target, address);
+	retval = flash_breakpoint_locate(target, address, length, &location,
+		record != NULL, handled);
+	if (retval != ERROR_OK || !*handled) {
+		if (record)
+			*handled = true;
+		return retval != ERROR_OK ? retval : (record ? ERROR_FLASH_BANK_INVALID : ERROR_OK);
+	}
+
+	if (record) {
+		if (record->length != length) {
+			LOG_TARGET_ERROR(target, "[FLASH-BP] tracked length mismatch at " TARGET_ADDR_FMT
+				" (tracked=%" PRIu32 ", requested=%" PRIu32 ")",
+				address, record->length, length);
+			return ERROR_FLASH_OPERATION_FAILED;
+		}
+		expected_breakpoint = record->breakpoint_instruction;
+		expected_original = record->original_instruction;
+	}
+
+	before = malloc(location.sector_size);
+	desired = malloc(location.sector_size);
+	verify = malloc(location.sector_size);
+	if (!before || !desired || !verify) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] out of host memory while restoring breakpoint at "
+			TARGET_ADDR_FMT, address);
+		retval = ERROR_FAIL;
+		goto done;
+	}
+
+	retval = flash_driver_read(location.bank, before, location.sector_offset,
+		location.sector_size);
+	if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] unable to read sector while restoring " TARGET_ADDR_FMT
+			" (error=%d)", address, retval);
+		goto done;
+	}
+
+	uint8_t *instruction = before + location.instruction_offset;
+	if (memcmp(instruction, expected_original, length) == 0) {
+		LOG_TARGET_WARNING(target, "[FLASH-BP] CLEAR address=" TARGET_ADDR_FMT
+			" was already restored", address);
+		if (record)
+			flash_breakpoint_remove_record(record);
+		retval = ERROR_OK;
+		goto done;
+	}
+
+	if (memcmp(instruction, expected_breakpoint, length) != 0) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] CLEAR conflict at " TARGET_ADDR_FMT
+			"; flash no longer contains the expected breakpoint opcode. Refusing to overwrite newer data",
+			address);
+		retval = ERROR_FLASH_OPERATION_FAILED;
+		goto done;
+	}
+
+	memcpy(desired, before, location.sector_size);
+	memcpy(desired + location.instruction_offset, expected_original, length);
+
+	LOG_TARGET_INFO(target, "[FLASH-BP] CLEAR begin address=" TARGET_ADDR_FMT
+		" length=%" PRIu32 " bank='%s' sector=%u",
+		address, length, location.bank->name, location.sector_index);
+	retval = flash_breakpoint_rewrite_sector(&location, before, desired,
+		verify, "CLEAR");
+	if (retval != ERROR_OK)
+		goto done;
+
+	if (record)
+		flash_breakpoint_remove_record(record);
+	LOG_TARGET_INFO(target, "[FLASH-BP] CLEAR complete address=" TARGET_ADDR_FMT,
+		address);
+
+done:
+	free(before);
+	free(desired);
+	free(verify);
+	return retval;
+}
+
+void flash_breakpoint_overlay_original(struct target *target,
+		target_addr_t address, uint32_t length, uint8_t *buffer)
+{
+	if (!target || !buffer || !length)
+		return;
+
+	for (struct flash_breakpoint_record *record = flash_breakpoint_records;
+			record; record = record->next) {
+		if (record->target != target)
+			continue;
+
+		target_addr_t distance;
+		uint32_t buffer_offset;
+		uint32_t record_offset;
+
+		/* Calculate the overlap without adding addresses, so a read ending
+		 * at the top of the target address space cannot wrap around. */
+		if (address <= record->address) {
+			distance = record->address - address;
+			if (distance >= length)
+				continue;
+			buffer_offset = distance;
+			record_offset = 0;
+		} else {
+			distance = address - record->address;
+			if (distance >= record->length)
+				continue;
+			buffer_offset = 0;
+			record_offset = distance;
+		}
+
+		uint32_t buffer_remaining = length - buffer_offset;
+		uint32_t record_remaining = record->length - record_offset;
+		uint32_t overlap_length = buffer_remaining < record_remaining ?
+			buffer_remaining : record_remaining;
+
+		/* Do not conceal firmware changed by another agent while a stale
+		 * record exists.  Only hide bytes that still contain the tracked
+		 * breakpoint opcode. */
+		if (memcmp(buffer + buffer_offset,
+				record->breakpoint_instruction + record_offset,
+				overlap_length) != 0)
+			continue;
+
+		memcpy(buffer + buffer_offset,
+			record->original_instruction + record_offset, overlap_length);
+	}
+}
+
+unsigned int flash_breakpoint_count(struct target *target)
+{
+	unsigned int count = 0;
+
+	for (struct flash_breakpoint_record *record = flash_breakpoint_records;
+			record; record = record->next) {
+		if (record->target == target)
+			count++;
+	}
+
+	return count;
+}
+
+int flash_breakpoint_restore_all(struct target *target)
+{
+	int first_error = ERROR_OK;
+	struct flash_breakpoint_record *record = flash_breakpoint_records;
+
+	while (record) {
+		struct flash_breakpoint_record *next = record->next;
+		if (record->target == target) {
+			bool handled = false;
+			int retval = flash_breakpoint_clear(target, record->address,
+				record->length, record->breakpoint_instruction,
+				record->original_instruction, &handled);
+			if (retval != ERROR_OK && first_error == ERROR_OK)
+				first_error = retval;
+		}
+		record = next;
+	}
+
+	return first_error;
+}
+
+void flash_breakpoint_forget_target(struct target *target)
+{
+	struct flash_breakpoint_record **record_p = &flash_breakpoint_records;
+
+	while (*record_p) {
+		struct flash_breakpoint_record *record = *record_p;
+		if (record->target != target) {
+			record_p = &record->next;
+			continue;
+		}
+
+		*record_p = record->next;
+		flash_breakpoint_free_record(record);
+	}
+}
 
 int flash_driver_erase(struct flash_bank *bank, unsigned int first,
 		unsigned int last)
@@ -317,7 +1011,7 @@ int get_flash_bank_by_addr(struct target *target,
 			return retval;
 		}
 		/* check whether address belongs to this flash bank */
-		if ((addr >= c->base) && (addr <= c->base + (c->size - 1))) {
+		if (c->size && addr >= c->base && addr - c->base < c->size) {
 			*result_bank = c;
 			return ERROR_OK;
 		}

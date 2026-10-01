@@ -3457,6 +3457,13 @@ void target_handle_md_output(struct command_invocation *cmd,
 				value_fmt, value);
 
 		if ((i % line_modulo == line_modulo - 1) || (i == count - 1)) {
+			/* Also echo mdw/mdh/mdb output directly to stdout so the
+			 * read value is visible on the local OpenOCD console.
+			 * Only when NuVoice MDW_DEBUG_INFO_ENABLE = Y. */
+			if (size <= 4 && nuvoice_mdw_log_enabled()) {
+				printf("%s\n", output);
+				fflush(stdout);
+			}
 			command_print(cmd, "%s", output);
 			output_len = 0;
 		}

@@ -105,6 +105,7 @@ static struct gdb_connection *current_gdb_connection;
 
 static int gdb_breakpoint_override;
 static enum breakpoint_type gdb_breakpoint_override_type;
+static int gdb_flash_breakpoint_fallback;
 
 static int gdb_error(struct connection *connection, int retval);
 static char *gdb_port;
@@ -1528,6 +1529,8 @@ static int gdb_read_memory_packet(struct connection *connection,
 		retval = rtos_read_buffer(target, addr, len, buffer);
 	if (retval == ERROR_NOT_IMPLEMENTED)
 		retval = target_read_buffer(target, addr, len, buffer);
+	if (retval == ERROR_OK)
+		flash_breakpoint_overlay_original(target, addr, len, buffer);
 
 	if ((retval != ERROR_OK) && !gdb_report_data_abort) {
 		/* TODO : Here we have to lie and send back all zero's lest stack traces won't work.
@@ -1774,6 +1777,27 @@ static int gdb_breakpoint_watchpoint_packet(struct connection *connection,
 		case 1:
 			if (packet[0] == 'Z') {
 				retval = breakpoint_add(target, address, size, bp_type);
+				if (retval == ERROR_TARGET_RESOURCE_NOT_AVAILABLE &&
+						bp_type == BKPT_HARD &&
+						gdb_flash_breakpoint_fallback) {
+					struct flash_bank *bank = NULL;
+					int bank_retval = get_flash_bank_by_addr(target,
+						address, false, &bank);
+					if (bank_retval == ERROR_OK &&
+							flash_breakpoint_is_enabled(bank)) {
+						LOG_TARGET_INFO(target, "[FLASH-BP] FALLBACK address="
+							TARGET_ADDR_FMT " reason=hardware-resource-exhausted; "
+							"retrying as a flash software breakpoint",
+							(target_addr_t)address);
+						retval = breakpoint_add(target, address, size,
+							BKPT_SOFT);
+						if (retval != ERROR_OK) {
+							LOG_TARGET_ERROR(target, "[FLASH-BP] FALLBACK failed at "
+								TARGET_ADDR_FMT " (error=%d)",
+								(target_addr_t)address, retval);
+						}
+					}
+				}
 				if (retval == ERROR_NOT_IMPLEMENTED) {
 					/* Send empty reply to report that breakpoints of this type are not supported */
 					gdb_put_packet(connection, "", 0);
@@ -3944,6 +3968,19 @@ COMMAND_HANDLER(handle_gdb_report_register_access_error)
 	return ERROR_OK;
 }
 
+COMMAND_HANDLER(handle_gdb_flash_breakpoint_fallback_command)
+{
+	if (CMD_ARGC > 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+	if (CMD_ARGC == 1)
+		COMMAND_PARSE_ENABLE(CMD_ARGV[0], gdb_flash_breakpoint_fallback);
+
+	LOG_USER("[FLASH-BP] GDB flash breakpoint fallback is %s",
+		gdb_flash_breakpoint_fallback ? "enabled" : "disabled");
+	return ERROR_OK;
+}
+
 /* gdb_breakpoint_override */
 COMMAND_HANDLER(handle_gdb_breakpoint_override_command)
 {
@@ -4079,6 +4116,14 @@ static const struct command_registration gdb_command_handlers[] = {
 		.help = "Display or specify type of breakpoint "
 			"to be used by gdb 'break' commands.",
 		.usage = "('hard'|'soft'|'disable')"
+	},
+	{
+		.name = "gdb_flash_breakpoint_fallback",
+		.handler = handle_gdb_flash_breakpoint_fallback_command,
+		.mode = COMMAND_ANY,
+		.help = "retry a hardware breakpoint request as a software breakpoint "
+			"when no hardware resource remains and the address is in an enabled NOR flash bank",
+		.usage = "['enable'|'disable']"
 	},
 	{
 		.name = "gdb_target_description",

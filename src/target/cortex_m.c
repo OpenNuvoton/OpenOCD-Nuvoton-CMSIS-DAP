@@ -29,6 +29,7 @@
 #include "arm_opcodes.h"
 #include "arm_semihosting.h"
 #include "smp.h"
+#include <flash/nor/core.h>
 #include <helper/time_support.h>
 #include <rtt/rtt.h>
 
@@ -1828,22 +1829,26 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 		}
 	} else if (breakpoint->type == BKPT_SOFT) {
 		uint8_t code[4];
+		bool flash_handled = false;
+		target_addr_t address = breakpoint->address & ~(target_addr_t)1;
 
 		/* NOTE: on ARMv6-M and ARMv7-M, BKPT(0xab) is used for
 		 * semihosting; don't use that.  Otherwise the BKPT
 		 * parameter is arbitrary.
 		 */
 		buf_set_u32(code, 0, 32, ARMV5_T_BKPT(0x11));
-		retval = target_read_memory(target,
-				breakpoint->address & 0xFFFFFFFE,
-				breakpoint->length, 1,
-				breakpoint->orig_instr);
-		if (retval != ERROR_OK)
-			return retval;
-		retval = target_write_memory(target,
-				breakpoint->address & 0xFFFFFFFE,
-				breakpoint->length, 1,
-				code);
+		retval = flash_breakpoint_set(target, address,
+			breakpoint->length, code, breakpoint->orig_instr,
+			&flash_handled);
+		if (!flash_handled && retval == ERROR_OK) {
+			retval = target_read_memory(target, address,
+					breakpoint->length, 1,
+					breakpoint->orig_instr);
+			if (retval != ERROR_OK)
+				return retval;
+			retval = target_write_memory(target, address,
+					breakpoint->length, 1, code);
+		}
 		if (retval != ERROR_OK)
 			return retval;
 		breakpoint->is_set = true;
@@ -1888,10 +1893,20 @@ int cortex_m_unset_breakpoint(struct target *target, struct breakpoint *breakpoi
 		target_write_u32(target, comparator_list[fp_num].fpcr_address,
 			comparator_list[fp_num].fpcr_value);
 	} else {
-		/* restore original instruction (kept in target endianness) */
-		retval = target_write_memory(target, breakpoint->address & 0xFFFFFFFE,
+		uint8_t code[4];
+		bool flash_handled = false;
+		target_addr_t address = breakpoint->address & ~(target_addr_t)1;
+
+		buf_set_u32(code, 0, 32, ARMV5_T_BKPT(0x11));
+		retval = flash_breakpoint_clear(target, address,
+			breakpoint->length, code, breakpoint->orig_instr,
+			&flash_handled);
+		if (!flash_handled && retval == ERROR_OK) {
+			/* restore original instruction (kept in target endianness) */
+			retval = target_write_memory(target, address,
 					breakpoint->length, 1,
 					breakpoint->orig_instr);
+		}
 		if (retval != ERROR_OK)
 			return retval;
 	}
@@ -2184,10 +2199,53 @@ static int cortex_m_init_target(struct command_context *cmd_ctx,
 	return ERROR_OK;
 }
 
+static void cortex_m_cleanup_flash_breakpoints(struct target *target)
+{
+	unsigned int count = flash_breakpoint_count(target);
+	if (!count)
+		return;
+
+	LOG_TARGET_WARNING(target, "[FLASH-BP] target teardown with %u active flash breakpoint(s); restoring them",
+		count);
+
+	bool resume_after_restore = target->state == TARGET_RUNNING;
+	int retval = ERROR_OK;
+
+	if (target_was_examined(target)) {
+		retval = target_poll(target);
+		if (retval == ERROR_OK && target->state != TARGET_HALTED) {
+			retval = target_halt(target);
+			if (retval == ERROR_OK)
+				retval = target_wait_state(target, TARGET_HALTED, 1000);
+		}
+	} else {
+		retval = ERROR_TARGET_NOT_EXAMINED;
+	}
+
+	if (retval == ERROR_OK)
+		retval = flash_breakpoint_restore_all(target);
+
+	if (retval == ERROR_OK && resume_after_restore) {
+		int resume_retval = target_resume(target, 1, 0, 0, 0);
+		if (resume_retval != ERROR_OK) {
+			LOG_TARGET_WARNING(target, "[FLASH-BP] breakpoints restored, but target resume during teardown failed (error=%d)",
+				resume_retval);
+		}
+	} else if (retval != ERROR_OK) {
+		LOG_TARGET_ERROR(target, "[FLASH-BP] teardown restore failed (error=%d); reflash the original image before running",
+			retval);
+	}
+
+	/* Never leave records referring to a target that is about to be freed. */
+	flash_breakpoint_forget_target(target);
+}
+
 void cortex_m_deinit_target(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 	struct armv7m_common *armv7m = target_to_armv7m(target);
+
+	cortex_m_cleanup_flash_breakpoints(target);
 
 	if (!armv7m->is_hla_target && armv7m->debug_ap)
 		dap_put_ap(armv7m->debug_ap);

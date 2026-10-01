@@ -1767,6 +1767,162 @@ static int numicro_dap_erase(struct flash_bank *bank, unsigned int first, unsign
 	return result;
 }
 
+/**
+ * @brief Read data from a NuMicro flash bank.
+ *
+ * N574 LDROM starts at 0x00200000, but it is not directly accessible
+ * through the Cortex-M SWD memory map.  Use the FMC ISP read command for
+ * that bank.  All other banks retain the original default_flash_read()
+ * behaviour.
+ */
+static int numicro_dap_read(struct flash_bank *bank, uint8_t *buffer,
+		uint32_t offset, uint32_t count)
+{
+	struct numicro_dap_flash_bank *flash_bank_info = bank->driver_priv;
+	struct target *target = bank->target;
+	uint32_t fmc_isp_base = NUMICRO_FMC_BASE;
+	uint32_t ahb_base = fmc_isp_base & 0xF0000000U;
+	uint32_t address;
+	uint32_t aligned_address;
+	uint32_t data;
+	uint32_t ispctl;
+	uint32_t isptrg;
+	uint32_t timeout;
+	uint32_t start_byte;
+	uint32_t copy_count;
+	int retval;
+
+	/* Keep the original fast direct-read path for all non-N574-LDROM banks. */
+	if (!flash_bank_info || !flash_bank_info->cpu ||
+		flash_bank_info->cpu->flash_type != FLASH_TYPE_NUVIOCE_N574 ||
+		bank->base != NUVOICE_DAP_LDROM_BASE)
+		return default_flash_read(bank, buffer, offset, count);
+
+	if (offset > bank->size || count > (bank->size - offset)) {
+		LOG_ERROR("N574 LDROM read is outside the flash bank");
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	if (count == 0U)
+		return ERROR_OK;
+
+	if (target->state != TARGET_HALTED) {
+		LOG_ERROR("Target must be halted before reading N574 LDROM");
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
+	LOG_DEBUG("N574 LDROM FMC ISP read: offset=0x%08" PRIx32
+		", count=0x%08" PRIx32, offset, count);
+
+	/* FMC registers are protected. */
+	retval = numicro_reg_unlock(target, ahb_base);
+	if (retval != ERROR_OK)
+		return retval;
+
+	/* Enable ISP and clear a stale ISP fail flag (ISPFF is write-one-to-clear). */
+	retval = target_read_u32(target,
+		fmc_isp_base + NUMICRO_FLASH_ISPCTL, &ispctl);
+	if (retval != ERROR_OK)
+		return retval;
+
+	ispctl |= ISPCTL_ISPEN;
+	retval = target_write_u32(target,
+		fmc_isp_base + NUMICRO_FLASH_ISPCTL,
+		ispctl | ISPCTL_ISPFF);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = target_read_u32(target,
+		fmc_isp_base + NUMICRO_FLASH_ISPCTL, &ispctl);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if ((ispctl & ISPCTL_ISPEN) == 0U) {
+		LOG_ERROR("Failed to enable N574 FMC ISP");
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	address = bank->base + offset;
+
+	while (count != 0U) {
+		aligned_address = address & ~3U;
+		start_byte = address & 3U;
+
+		/* ISP command 0x00 reads one 32-bit word. */
+		retval = target_write_u32(target,
+			fmc_isp_base + NUMICRO_FLASH_ISPCMD, 0x00000000U);
+		if (retval != ERROR_OK)
+			return retval;
+
+		retval = target_write_u32(target,
+			fmc_isp_base + NUMICRO_FLASH_ISPADR, aligned_address);
+		if (retval != ERROR_OK)
+			return retval;
+
+		retval = target_write_u32(target,
+			fmc_isp_base + NUMICRO_FLASH_ISPDAT, 0x00000000U);
+		if (retval != ERROR_OK)
+			return retval;
+
+		retval = target_write_u32(target,
+			fmc_isp_base + NUMICRO_FLASH_ISPTRG, ISPTRG_ISPGO);
+		if (retval != ERROR_OK)
+			return retval;
+
+		/* Wait for ISPGO to clear, but never leave OpenOCD in an infinite loop. */
+		timeout = 100000U;
+		do {
+			retval = target_read_u32(target,
+				fmc_isp_base + NUMICRO_FLASH_ISPTRG, &isptrg);
+			if (retval != ERROR_OK)
+				return retval;
+
+			if ((isptrg & ISPTRG_ISPGO) == 0U)
+				break;
+		} while (--timeout != 0U);
+
+		if (timeout == 0U) {
+			LOG_ERROR("N574 LDROM ISP read timeout at 0x%08" PRIx32,
+				aligned_address);
+			return ERROR_FLASH_OPERATION_FAILED;
+		}
+
+		retval = target_read_u32(target,
+			fmc_isp_base + NUMICRO_FLASH_ISPCTL, &ispctl);
+		if (retval != ERROR_OK)
+			return retval;
+
+		if ((ispctl & ISPCTL_ISPFF) != 0U) {
+			LOG_ERROR("N574 LDROM ISP read failed at 0x%08" PRIx32
+				", ISPCTL=0x%08" PRIx32, aligned_address, ispctl);
+
+			/* Clear ISPFF while preserving the other ISPCTL bits. */
+			(void)target_write_u32(target,
+				fmc_isp_base + NUMICRO_FLASH_ISPCTL,
+				ispctl | ISPCTL_ISPFF);
+			return ERROR_FLASH_OPERATION_FAILED;
+		}
+
+		retval = target_read_u32(target,
+			fmc_isp_base + NUMICRO_FLASH_ISPDAT, &data);
+		if (retval != ERROR_OK)
+			return retval;
+
+		copy_count = 4U - start_byte;
+		if (copy_count > count)
+			copy_count = count;
+
+		for (uint32_t i = 0; i < copy_count; i++)
+			buffer[i] = (uint8_t)(data >> (8U * (start_byte + i)));
+
+		buffer += copy_count;
+		address += copy_count;
+		count -= copy_count;
+	}
+
+	return ERROR_OK;
+}
+
 static int numicro_dap_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t offset, uint32_t count)
 {
 	int	result = ERROR_OK;
@@ -2350,7 +2506,7 @@ const struct flash_driver numicro_dap_flash = {
 	.erase					= numicro_dap_erase,
 	.protect				= numicro_dap_protect,
 	.write					= numicro_dap_write,
-	.read					= default_flash_read,
+	.read					= numicro_dap_read,
 	.probe					= numicro_dap_probe,
 	.auto_probe				= numicro_dap_auto_probe,
 	.erase_check			= numicro_dap_erase_check,

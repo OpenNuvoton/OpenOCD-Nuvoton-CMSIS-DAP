@@ -2253,6 +2253,15 @@ GDB behaviour is not sufficient. GDB normally uses hardware
 breakpoints if the memory map has been set up for flash regions.
 @end deffn
 
+@anchor{gdbflashbreakpointfallback}
+@deffn {Command} {gdb_flash_breakpoint_fallback} [@option{enable}|@option{disable}]
+When enabled, retry a GDB hardware breakpoint request as a software
+breakpoint if the target reports that no hardware breakpoint resource is
+available and the address belongs to a configured NOR flash bank.  The
+default is @option{disable}.  This fallback also requires
+@command{flash breakpoint} to be enabled for the containing bank.
+@end deffn
+
 @anchor{gdbflashprogram}
 @deffn {Config Command} {gdb_flash_program} (@option{enable}|@option{disable})
 Set to @option{enable} to cause OpenOCD to program the flash memory when a
@@ -5484,6 +5493,28 @@ for more information.
 This command is not available after OpenOCD initialization has completed.
 Use it in board specific configuration files, not interactively.
 @end quotation
+@end deffn
+
+@deffn {Command} {flash breakpoint} bank_id [@option{enable}|@option{disable}]
+Enable or disable transactional software breakpoints in one configured NOR
+flash bank.  The default is @option{disable} for every bank.  When enabled,
+insertion and removal preserve, erase, rewrite, and verify the complete
+containing sector.  A failed transaction attempts to restore the sector
+contents captured before the operation.  Because this operation consumes
+flash erase cycles, enable it only for banks and flash drivers where this
+behavior is intended.  Omitting the last argument displays the current state.
+
+Each transaction also saves the target's complete configured working area
+before changing flash, then restores and verifies that memory before returning.
+This protection is independent of the target's @option{-work-area-backup}
+setting and covers algorithm code, data, gaps, and stack use within the working
+area.  A working-area save failure aborts before flash is changed.  If restoring
+the working area fails after a successful flash update, OpenOCD attempts to roll
+back the flash sector and retries the memory restoration.
+
+When enabling a bank on an already examined target, OpenOCD probes an unprobed
+bank first.  Enable is rejected if probing fails or the resulting bank size is
+zero.  Configuration-time enable remains available before target examination.
 @end deffn
 
 @comment less confusing would be: "flash list" (like "nand list")

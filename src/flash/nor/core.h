@@ -76,6 +76,7 @@ struct flash_bank {
 	char *name;
 
 	struct target *target; /**< Target to which this bank belongs. */
+	bool breakpoints_enabled; /**< Allow transactional software breakpoints. */
 
 	const struct flash_driver *driver; /**< Driver for this bank. */
 	void *driver_priv; /**< Private driver storage pointer */
@@ -172,6 +173,51 @@ target_addr_t flash_write_align_end(struct flash_bank *bank, target_addr_t addr)
  */
 int flash_write(struct target *target,
 		struct image *image, uint32_t *written, bool erase);
+
+/** Enable or disable software-breakpoint transactions for @a bank. */
+void flash_breakpoint_set_enabled(struct flash_bank *bank, bool enabled);
+
+/** Return whether software-breakpoint transactions are enabled for @a bank. */
+bool flash_breakpoint_is_enabled(const struct flash_bank *bank);
+
+/**
+ * Replace an instruction in NOR flash with a software-breakpoint opcode.
+ *
+ * The implementation preserves the complete erase sector, performs an
+ * erase/write/read-back transaction, and rolls the sector back when a
+ * recoverable operation fails.  If @a address is not part of a configured
+ * NOR flash bank, @a handled is set to false and no target access is made.
+ */
+int flash_breakpoint_set(struct target *target, target_addr_t address,
+		uint32_t length, const uint8_t *breakpoint_instruction,
+		uint8_t *original_instruction, bool *handled);
+
+/**
+ * Restore an instruction previously replaced by flash_breakpoint_set().
+ *
+ * If @a address is not part of a configured NOR flash bank, @a handled is
+ * set to false so the target layer can use its normal RAM breakpoint path.
+ */
+int flash_breakpoint_clear(struct target *target, target_addr_t address,
+		uint32_t length, const uint8_t *breakpoint_instruction,
+		const uint8_t *original_instruction, bool *handled);
+
+/**
+ * Replace tracked Flash breakpoint opcodes in a front-end read buffer with
+ * their saved original instruction bytes.  Bytes that no longer match the
+ * tracked opcode are left untouched.
+ */
+void flash_breakpoint_overlay_original(struct target *target,
+		target_addr_t address, uint32_t length, uint8_t *buffer);
+
+/** Return the number of tracked flash breakpoints for @a target. */
+unsigned int flash_breakpoint_count(struct target *target);
+
+/** Restore every tracked flash breakpoint for @a target. */
+int flash_breakpoint_restore_all(struct target *target);
+
+/** Discard any remaining host-side records for @a target. */
+void flash_breakpoint_forget_target(struct target *target);
 
 /**
  * Forces targets to re-examine their erase/protection state.

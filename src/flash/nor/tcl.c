@@ -1364,6 +1364,44 @@ COMMAND_HANDLER(handle_flash_init_command)
 	return flash_init_drivers(CMD_CTX);
 }
 
+COMMAND_HANDLER(handle_flash_breakpoint_command)
+{
+	if (CMD_ARGC < 1 || CMD_ARGC > 2)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+	struct flash_bank *bank;
+	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank_maybe_probe,
+		0, &bank, false);
+	if (retval != ERROR_OK)
+		return retval;
+	if (!bank) {
+		command_print(CMD, "flash bank '#%s' is out of bounds", CMD_ARGV[0]);
+		return ERROR_FAIL;
+	}
+
+	if (CMD_ARGC == 2) {
+		bool enabled;
+		COMMAND_PARSE_ENABLE(CMD_ARGV[1], enabled);
+		if (enabled && target_was_examined(bank->target) && !bank->size) {
+			struct flash_bank *probed_bank = NULL;
+			retval = CALL_COMMAND_HANDLER(flash_command_get_bank_maybe_probe,
+				0, &probed_bank, true);
+			if (retval != ERROR_OK || !probed_bank || !probed_bank->size) {
+				flash_breakpoint_set_enabled(bank, false);
+				LOG_ERROR("[FLASH-BP] cannot enable bank '%s': probe failed or bank has zero size",
+					bank->name);
+				return retval != ERROR_OK ? retval : ERROR_FLASH_BANK_INVALID;
+			}
+			bank = probed_bank;
+		}
+		flash_breakpoint_set_enabled(bank, enabled);
+	}
+
+	command_print(CMD, "[FLASH-BP] NOR flash software breakpoints for bank '%s' are %s",
+		bank->name, flash_breakpoint_is_enabled(bank) ? "enabled" : "disabled");
+	return ERROR_OK;
+}
+
 static const struct command_registration flash_config_command_handlers[] = {
 	{
 		.name = "bank",
@@ -1395,6 +1433,13 @@ static const struct command_registration flash_config_command_handlers[] = {
 		.handler = handle_flash_list,
 		.help = "Returns a list of details about the flash banks.",
 		.usage = "",
+	},
+	{
+		.name = "breakpoint",
+		.mode = COMMAND_ANY,
+		.handler = handle_flash_breakpoint_command,
+		.help = "enable or disable transactional software breakpoints for a NOR flash bank",
+		.usage = "bank_id ['enable'|'disable']",
 	},
 	COMMAND_REGISTRATION_DONE
 };
